@@ -302,6 +302,7 @@ export class SpiritMCPServer {
     spiritId: string;
     amount: string;
     currency?: string;
+    decimals?: number;
   }): Promise<MCPToolResult> {
     if (!this.client.hasWallet()) {
       return this.errorResult(
@@ -311,6 +312,8 @@ export class SpiritMCPServer {
 
     const amount = BigInt(args.amount);
     const isNative = !args.currency || args.currency.toLowerCase() === 'eth';
+    // Default to 18 decimals for ETH, 6 for USDC-like tokens, or use provided value
+    const decimals = args.decimals ?? (isNative ? 18 : 6);
 
     let event;
     if (isNative) {
@@ -326,17 +329,35 @@ export class SpiritMCPServer {
       });
     }
 
+    // Format amounts based on token decimals
+    const formatAmount = (wei: bigint) => {
+      const divisor = 10n ** BigInt(decimals);
+      const whole = wei / divisor;
+      const fraction = wei % divisor;
+      const fractionStr = fraction.toString().padStart(decimals, '0').slice(0, 6);
+      return `${whole}.${fractionStr}`;
+    };
+
     return this.textResult(
       JSON.stringify(
         {
           success: true,
           message: `Revenue routed for "${args.spiritId}"`,
+          currency: isNative ? 'ETH' : args.currency,
+          decimals,
           amounts: {
-            total: formatEther(event.amount),
-            artist: formatEther(event.artistAmount),
-            agent: formatEther(event.agentAmount),
-            platform: formatEther(event.platformAmount),
-            protocol: formatEther(event.protocolAmount),
+            total: formatAmount(event.amount),
+            artist: formatAmount(event.artistAmount),
+            agent: formatAmount(event.agentAmount),
+            platform: formatAmount(event.platformAmount),
+            protocol: formatAmount(event.protocolAmount),
+          },
+          amountsRaw: {
+            total: event.amount.toString(),
+            artist: event.artistAmount.toString(),
+            agent: event.agentAmount.toString(),
+            platform: event.platformAmount.toString(),
+            protocol: event.protocolAmount.toString(),
           },
           transactionHash: event.txHash,
           explorerUrl: this.client.getExplorerUrl(event.txHash),

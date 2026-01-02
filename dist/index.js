@@ -388,7 +388,24 @@ var SpiritClient = class {
   constructor(config) {
     this.chainId = config.chainId;
     this.chain = getChain(config.chainId);
-    this.addresses = { ...getAddresses(config.chainId), ...config.contracts };
+    this.addresses = { ...getAddresses(config.chainId) };
+    if (config.contracts) {
+      if (config.contracts.registry) {
+        this.addresses.SpiritRegistry = config.contracts.registry;
+      }
+      if (config.contracts.router) {
+        this.addresses.RoyaltyRouter = config.contracts.router;
+      }
+      if (config.contracts.spiritToken) {
+        this.addresses.SpiritToken = config.contracts.spiritToken;
+      }
+      if (config.contracts.stakingPool) {
+        this.addresses.StakingPool = config.contracts.stakingPool;
+      }
+      if (config.contracts.factory) {
+        this.addresses.SpiritFactory = config.contracts.factory;
+      }
+    }
     const rpcUrl = config.rpcUrl || CHAIN_CONFIG[config.chainId].rpcUrl;
     this.publicClient = (0, import_viem.createPublicClient)({
       chain: this.chain,
@@ -408,49 +425,46 @@ var SpiritClient = class {
   // ==========================================================================
   /**
    * Get agent record by spiritId
+   *
+   * @returns Agent record if found, null if not registered
+   * @throws Error on network/RPC failures
    */
   async getAgent(spiritId) {
-    try {
-      const result = await this.publicClient.readContract({
-        address: this.addresses.SpiritRegistry,
-        abi: SPIRIT_REGISTRY_ABI,
-        functionName: "getAgent",
-        args: [spiritId]
-      });
-      const agent = parseAgentRecord(result);
-      if (agent.registryTokenId === 0n) {
-        return null;
-      }
-      return agent;
-    } catch {
+    const result = await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: "getAgent",
+      args: [spiritId]
+    });
+    const agent = parseAgentRecord(result);
+    if (agent.registryTokenId === 0n) {
       return null;
     }
+    return agent;
   }
   /**
    * Get recipients and split configuration for an agent
+   *
+   * @throws Error on network/RPC failures or if agent not found
    */
   async getRecipients(spiritId) {
-    try {
-      const result = await this.publicClient.readContract({
-        address: this.addresses.SpiritRegistry,
-        abi: SPIRIT_REGISTRY_ABI,
-        functionName: "getRecipients",
-        args: [spiritId]
-      });
-      return {
-        trainer: result[0],
-        platform: result[1],
-        treasury: result[2],
-        split: {
-          artistBps: result[3].artistBps,
-          agentBps: result[3].agentBps,
-          platformBps: result[3].platformBps,
-          protocolBps: result[3].protocolBps
-        }
-      };
-    } catch {
-      return null;
-    }
+    const result = await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: "getRecipients",
+      args: [spiritId]
+    });
+    return {
+      trainer: result[0],
+      platform: result[1],
+      treasury: result[2],
+      split: {
+        artistBps: result[3].artistBps,
+        agentBps: result[3].agentBps,
+        platformBps: result[3].platformBps,
+        protocolBps: result[3].protocolBps
+      }
+    };
   }
   /**
    * Resolve spiritId to spiritKey (keccak256 hash)

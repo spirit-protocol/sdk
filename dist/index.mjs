@@ -12,7 +12,7 @@ import {
   ZERO_ADDRESS,
   ZERO_HASH,
   getAddresses
-} from "./chunk-MBKUQIXQ.mjs";
+} from "./chunk-TTKW6T2B.mjs";
 
 // src/index.ts
 var VERSION = "0.1.0";

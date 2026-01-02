@@ -36,17 +36,22 @@ declare class SpiritClient {
     constructor(config: SpiritConfig);
     /**
      * Get agent record by spiritId
+     *
+     * @returns Agent record if found, null if not registered
+     * @throws Error on network/RPC failures
      */
     getAgent(spiritId: string): Promise<SpiritAgent | null>;
     /**
      * Get recipients and split configuration for an agent
+     *
+     * @throws Error on network/RPC failures or if agent not found
      */
     getRecipients(spiritId: string): Promise<{
         trainer: Address;
         platform: Address;
         treasury: Address;
         split: SplitConfig;
-    } | null>;
+    }>;
     /**
      * Resolve spiritId to spiritKey (keccak256 hash)
      */

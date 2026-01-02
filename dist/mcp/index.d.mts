@@ -75,11 +75,15 @@ declare const SPIRIT_TOOLS: readonly [{
             };
             readonly amount: {
                 readonly type: "string";
-                readonly description: "Amount in wei to route (as string to handle large numbers)";
+                readonly description: "Amount in smallest units (wei for ETH, raw units for ERC20)";
             };
             readonly currency: {
                 readonly type: "string";
                 readonly description: "Token address for ERC20 payments, or \"ETH\" for native payments. Defaults to ETH.";
+            };
+            readonly decimals: {
+                readonly type: "number";
+                readonly description: "Token decimals for formatting (18 for ETH, 6 for USDC). Defaults to 18 for ETH, 6 for ERC20.";
             };
         };
         readonly required: readonly ["spiritId", "amount"];

@@ -1,6 +1,6 @@
 import {
   SpiritClient
-} from "../chunk-MBKUQIXQ.mjs";
+} from "../chunk-TTKW6T2B.mjs";
 
 // src/mcp/tools.ts
 var SPIRIT_TOOLS = [
@@ -74,11 +74,15 @@ var SPIRIT_TOOLS = [
         },
         amount: {
           type: "string",
-          description: "Amount in wei to route (as string to handle large numbers)"
+          description: "Amount in smallest units (wei for ETH, raw units for ERC20)"
         },
         currency: {
           type: "string",
           description: 'Token address for ERC20 payments, or "ETH" for native payments. Defaults to ETH.'
+        },
+        decimals: {
+          type: "number",
+          description: "Token decimals for formatting (18 for ETH, 6 for USDC). Defaults to 18 for ETH, 6 for ERC20."
         }
       },
       required: ["spiritId", "amount"]
@@ -335,6 +339,7 @@ var SpiritMCPServer = class {
     }
     const amount = BigInt(args.amount);
     const isNative = !args.currency || args.currency.toLowerCase() === "eth";
+    const decimals = args.decimals ?? (isNative ? 18 : 6);
     let event;
     if (isNative) {
       event = await this.client.routeRevenueNative({
@@ -348,17 +353,33 @@ var SpiritMCPServer = class {
         amount
       });
     }
+    const formatAmount = (wei) => {
+      const divisor = 10n ** BigInt(decimals);
+      const whole = wei / divisor;
+      const fraction = wei % divisor;
+      const fractionStr = fraction.toString().padStart(decimals, "0").slice(0, 6);
+      return `${whole}.${fractionStr}`;
+    };
     return this.textResult(
       JSON.stringify(
         {
           success: true,
           message: `Revenue routed for "${args.spiritId}"`,
+          currency: isNative ? "ETH" : args.currency,
+          decimals,
           amounts: {
-            total: formatEther(event.amount),
-            artist: formatEther(event.artistAmount),
-            agent: formatEther(event.agentAmount),
-            platform: formatEther(event.platformAmount),
-            protocol: formatEther(event.protocolAmount)
+            total: formatAmount(event.amount),
+            artist: formatAmount(event.artistAmount),
+            agent: formatAmount(event.agentAmount),
+            platform: formatAmount(event.platformAmount),
+            protocol: formatAmount(event.protocolAmount)
+          },
+          amountsRaw: {
+            total: event.amount.toString(),
+            artist: event.artistAmount.toString(),
+            agent: event.agentAmount.toString(),
+            platform: event.platformAmount.toString(),
+            protocol: event.protocolAmount.toString()
           },
           transactionHash: event.txHash,
           explorerUrl: this.client.getExplorerUrl(event.txHash)

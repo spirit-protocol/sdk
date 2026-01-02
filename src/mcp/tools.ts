@@ -89,12 +89,17 @@ export const SPIRIT_TOOLS = [
         },
         amount: {
           type: 'string',
-          description: 'Amount in wei to route (as string to handle large numbers)',
+          description: 'Amount in smallest units (wei for ETH, raw units for ERC20)',
         },
         currency: {
           type: 'string',
           description:
             'Token address for ERC20 payments, or "ETH" for native payments. Defaults to ETH.',
+        },
+        decimals: {
+          type: 'number',
+          description:
+            'Token decimals for formatting (18 for ETH, 6 for USDC). Defaults to 18 for ETH, 6 for ERC20.',
         },
       },
       required: ['spiritId', 'amount'],

@@ -152,11 +152,33 @@ See [examples/claude-agent-sdk](./examples/claude-agent-sdk) for complete exampl
 
 ### Base Sepolia (Testnet)
 
+**Core Contracts (required for SDK):**
+
+| Contract | Address | Status |
+|----------|---------|--------|
+| SpiritRegistry | `TBD` | Pending deployment |
+| RoyaltyRouter | `TBD` | Pending deployment |
+
+**Layer 2 Contracts (staking, tokens):**
+
 | Contract | Address |
 |----------|---------|
 | SpiritToken | `0xC3FD6880fC602d999f64C4a38dF51BEB6e1b654B` |
 | SpiritFactory | `0x53B9db3DCF3a69a0F62c44b19a6c37149b7fB93b` |
 | StakingPool | `0xBBC3C7dc9151FFDc97e04E84Ad0fE91aF91D9DeE` |
+
+**Important:** Until SpiritRegistry and RoyaltyRouter are deployed, you must provide addresses via config:
+
+```typescript
+const spirit = new SpiritClient({
+  chainId: 84532,
+  privateKey: process.env.PRIVATE_KEY,
+  contracts: {
+    registry: '0x...', // Your deployed SpiritRegistry
+    router: '0x...',   // Your deployed RoyaltyRouter
+  },
+});
+```
 
 ### Base Mainnet
 

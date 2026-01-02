@@ -363,7 +363,24 @@ var SpiritClient = class {
   constructor(config) {
     this.chainId = config.chainId;
     this.chain = getChain(config.chainId);
-    this.addresses = { ...getAddresses(config.chainId), ...config.contracts };
+    this.addresses = { ...getAddresses(config.chainId) };
+    if (config.contracts) {
+      if (config.contracts.registry) {
+        this.addresses.SpiritRegistry = config.contracts.registry;
+      }
+      if (config.contracts.router) {
+        this.addresses.RoyaltyRouter = config.contracts.router;
+      }
+      if (config.contracts.spiritToken) {
+        this.addresses.SpiritToken = config.contracts.spiritToken;
+      }
+      if (config.contracts.stakingPool) {
+        this.addresses.StakingPool = config.contracts.stakingPool;
+      }
+      if (config.contracts.factory) {
+        this.addresses.SpiritFactory = config.contracts.factory;
+      }
+    }
     const rpcUrl = config.rpcUrl || CHAIN_CONFIG[config.chainId].rpcUrl;
     this.publicClient = (0, import_viem.createPublicClient)({
       chain: this.chain,
@@ -383,49 +400,46 @@ var SpiritClient = class {
   // ==========================================================================
   /**
    * Get agent record by spiritId
+   *
+   * @returns Agent record if found, null if not registered
+   * @throws Error on network/RPC failures
    */
   async getAgent(spiritId) {
-    try {
-      const result = await this.publicClient.readContract({
-        address: this.addresses.SpiritRegistry,
-        abi: SPIRIT_REGISTRY_ABI,
-        functionName: "getAgent",
-        args: [spiritId]
-      });
-      const agent = parseAgentRecord(result);
-      if (agent.registryTokenId === 0n) {
-        return null;
-      }
-      return agent;
-    } catch {
+    const result = await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: "getAgent",
+      args: [spiritId]
+    });
+    const agent = parseAgentRecord(result);
+    if (agent.registryTokenId === 0n) {
       return null;
     }
+    return agent;
   }
   /**
    * Get recipients and split configuration for an agent
+   *
+   * @throws Error on network/RPC failures or if agent not found
    */
   async getRecipients(spiritId) {
-    try {
-      const result = await this.publicClient.readContract({
-        address: this.addresses.SpiritRegistry,
-        abi: SPIRIT_REGISTRY_ABI,
-        functionName: "getRecipients",
-        args: [spiritId]
-      });
-      return {
-        trainer: result[0],
-        platform: result[1],
-        treasury: result[2],
-        split: {
-          artistBps: result[3].artistBps,
-          agentBps: result[3].agentBps,
-          platformBps: result[3].platformBps,
-          protocolBps: result[3].protocolBps
-        }
-      };
-    } catch {
-      return null;
-    }
+    const result = await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: "getRecipients",
+      args: [spiritId]
+    });
+    return {
+      trainer: result[0],
+      platform: result[1],
+      treasury: result[2],
+      split: {
+        artistBps: result[3].artistBps,
+        agentBps: result[3].agentBps,
+        platformBps: result[3].platformBps,
+        protocolBps: result[3].protocolBps
+      }
+    };
   }
   /**
    * Resolve spiritId to spiritKey (keccak256 hash)
@@ -728,11 +742,15 @@ var SPIRIT_TOOLS = [
         },
         amount: {
           type: "string",
-          description: "Amount in wei to route (as string to handle large numbers)"
+          description: "Amount in smallest units (wei for ETH, raw units for ERC20)"
         },
         currency: {
           type: "string",
           description: 'Token address for ERC20 payments, or "ETH" for native payments. Defaults to ETH.'
+        },
+        decimals: {
+          type: "number",
+          description: "Token decimals for formatting (18 for ETH, 6 for USDC). Defaults to 18 for ETH, 6 for ERC20."
         }
       },
       required: ["spiritId", "amount"]
@@ -989,6 +1007,7 @@ var SpiritMCPServer = class {
     }
     const amount = BigInt(args.amount);
     const isNative = !args.currency || args.currency.toLowerCase() === "eth";
+    const decimals = args.decimals ?? (isNative ? 18 : 6);
     let event;
     if (isNative) {
       event = await this.client.routeRevenueNative({
@@ -1002,17 +1021,33 @@ var SpiritMCPServer = class {
         amount
       });
     }
+    const formatAmount = (wei) => {
+      const divisor = 10n ** BigInt(decimals);
+      const whole = wei / divisor;
+      const fraction = wei % divisor;
+      const fractionStr = fraction.toString().padStart(decimals, "0").slice(0, 6);
+      return `${whole}.${fractionStr}`;
+    };
     return this.textResult(
       JSON.stringify(
         {
           success: true,
           message: `Revenue routed for "${args.spiritId}"`,
+          currency: isNative ? "ETH" : args.currency,
+          decimals,
           amounts: {
-            total: (0, import_viem2.formatEther)(event.amount),
-            artist: (0, import_viem2.formatEther)(event.artistAmount),
-            agent: (0, import_viem2.formatEther)(event.agentAmount),
-            platform: (0, import_viem2.formatEther)(event.platformAmount),
-            protocol: (0, import_viem2.formatEther)(event.protocolAmount)
+            total: formatAmount(event.amount),
+            artist: formatAmount(event.artistAmount),
+            agent: formatAmount(event.agentAmount),
+            platform: formatAmount(event.platformAmount),
+            protocol: formatAmount(event.protocolAmount)
+          },
+          amountsRaw: {
+            total: event.amount.toString(),
+            artist: event.artistAmount.toString(),
+            agent: event.agentAmount.toString(),
+            platform: event.platformAmount.toString(),
+            protocol: event.protocolAmount.toString()
           },
           transactionHash: event.txHash,
           explorerUrl: this.client.getExplorerUrl(event.txHash)

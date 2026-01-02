@@ -119,7 +119,28 @@ export class SpiritClient {
   constructor(config: SpiritConfig) {
     this.chainId = config.chainId;
     this.chain = getChain(config.chainId);
-    this.addresses = { ...getAddresses(config.chainId), ...config.contracts };
+
+    // Start with default addresses for the chain
+    this.addresses = { ...getAddresses(config.chainId) };
+
+    // Map user-friendly config keys to actual contract names
+    if (config.contracts) {
+      if (config.contracts.registry) {
+        this.addresses.SpiritRegistry = config.contracts.registry;
+      }
+      if (config.contracts.router) {
+        this.addresses.RoyaltyRouter = config.contracts.router;
+      }
+      if (config.contracts.spiritToken) {
+        this.addresses.SpiritToken = config.contracts.spiritToken;
+      }
+      if (config.contracts.stakingPool) {
+        this.addresses.StakingPool = config.contracts.stakingPool;
+      }
+      if (config.contracts.factory) {
+        this.addresses.SpiritFactory = config.contracts.factory;
+      }
+    }
 
     const rpcUrl = config.rpcUrl || CHAIN_CONFIG[config.chainId].rpcUrl;
 
@@ -144,60 +165,57 @@ export class SpiritClient {
 
   /**
    * Get agent record by spiritId
+   *
+   * @returns Agent record if found, null if not registered
+   * @throws Error on network/RPC failures
    */
   async getAgent(spiritId: string): Promise<SpiritAgent | null> {
-    try {
-      const result = await this.publicClient.readContract({
-        address: this.addresses.SpiritRegistry,
-        abi: SPIRIT_REGISTRY_ABI,
-        functionName: 'getAgent',
-        args: [spiritId],
-      });
+    const result = await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: 'getAgent',
+      args: [spiritId],
+    });
 
-      const agent = parseAgentRecord(result);
+    const agent = parseAgentRecord(result);
 
-      // Check if agent exists (registryTokenId > 0)
-      if (agent.registryTokenId === 0n) {
-        return null;
-      }
-
-      return agent;
-    } catch {
+    // Check if agent exists (registryTokenId > 0)
+    if (agent.registryTokenId === 0n) {
       return null;
     }
+
+    return agent;
   }
 
   /**
    * Get recipients and split configuration for an agent
+   *
+   * @throws Error on network/RPC failures or if agent not found
    */
   async getRecipients(spiritId: string): Promise<{
     trainer: Address;
     platform: Address;
     treasury: Address;
     split: SplitConfig;
-  } | null> {
-    try {
-      const result = await this.publicClient.readContract({
-        address: this.addresses.SpiritRegistry,
-        abi: SPIRIT_REGISTRY_ABI,
-        functionName: 'getRecipients',
-        args: [spiritId],
-      }) as [Address, Address, Address, { artistBps: number; agentBps: number; platformBps: number; protocolBps: number }];
+  }> {
+    const result = await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: 'getRecipients',
+      args: [spiritId],
+    }) as [Address, Address, Address, { artistBps: number; agentBps: number; platformBps: number; protocolBps: number }];
 
-      return {
-        trainer: result[0],
-        platform: result[1],
-        treasury: result[2],
-        split: {
-          artistBps: result[3].artistBps,
-          agentBps: result[3].agentBps,
-          platformBps: result[3].platformBps,
-          protocolBps: result[3].protocolBps,
-        },
-      };
-    } catch {
-      return null;
-    }
+    return {
+      trainer: result[0],
+      platform: result[1],
+      treasury: result[2],
+      split: {
+        artistBps: result[3].artistBps,
+        agentBps: result[3].agentBps,
+        platformBps: result[3].platformBps,
+        protocolBps: result[3].protocolBps,
+      },
+    };
   }
 
   /**
