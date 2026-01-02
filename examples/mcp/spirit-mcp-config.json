@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "mcpServers": {
+    "spirit-protocol": {
+      "command": "npx",
+      "args": ["tsx", "node_modules/@spirit-protocol/sdk/dist/mcp/server.js"],
+      "env": {
+        "SPIRIT_CHAIN_ID": "84532",
+        "SPIRIT_PRIVATE_KEY": "${AGENT_PRIVATE_KEY}"
+      }
+    }
+  }
+}

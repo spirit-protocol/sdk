@@ -1,0 +1,34 @@
+import {
+  AgentStatus,
+  BPS_DENOMINATOR,
+  CHAIN_CONFIG,
+  DEFAULT_SPLIT,
+  DEFAULT_SPLIT_BPS,
+  MAINNET_ADDRESSES,
+  ROYALTY_ROUTER_ABI,
+  SPIRIT_REGISTRY_ABI,
+  SpiritClient,
+  TESTNET_ADDRESSES,
+  ZERO_ADDRESS,
+  ZERO_HASH,
+  getAddresses
+} from "./chunk-MBKUQIXQ.mjs";
+
+// src/index.ts
+var VERSION = "0.1.0";
+export {
+  AgentStatus,
+  BPS_DENOMINATOR,
+  CHAIN_CONFIG,
+  DEFAULT_SPLIT,
+  DEFAULT_SPLIT_BPS,
+  MAINNET_ADDRESSES,
+  ROYALTY_ROUTER_ABI,
+  SPIRIT_REGISTRY_ABI,
+  SpiritClient,
+  TESTNET_ADDRESSES,
+  VERSION,
+  ZERO_ADDRESS,
+  ZERO_HASH,
+  getAddresses
+};
