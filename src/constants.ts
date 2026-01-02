@@ -33,9 +33,9 @@ export const CHAIN_CONFIG = {
 
 /** Testnet (Base Sepolia) contract addresses */
 export const TESTNET_ADDRESSES: Record<string, Address> = {
-  // Layer 1: Minimal (spirit-onboarding-demo)
-  SpiritRegistry: '0x0000000000000000000000000000000000000000', // TODO: Deploy
-  RoyaltyRouter: '0x0000000000000000000000000000000000000000', // TODO: Deploy
+  // Layer 1: Minimal (spirit-onboarding-demo) - Deployed Jan 2, 2026
+  SpiritRegistry: '0x4a0e642e9aec25c5856987e95c0410ae10e8de5e',
+  RoyaltyRouter: '0x271bf11777ff7cbb9d938d2122d01493f6e9fc21',
 
   // Layer 2: Full (spirit-contracts-core)
   SpiritToken: '0xC3FD6880fC602d999f64C4a38dF51BEB6e1b654B',
@@ -44,7 +44,7 @@ export const TESTNET_ADDRESSES: Record<string, Address> = {
   RewardController: '0xD91CCC7eeA5c0aD0f6e5E2c6E5c08bdF5C1cA1b0',
 
   // Protocol Treasury (for 25% protocol share)
-  ProtocolTreasury: '0x0000000000000000000000000000000000000000', // TODO: Set
+  ProtocolTreasury: '0xe4951bEE6FA86B809655922f610FF74C0E33416C',
 };
 
 /** Mainnet (Base) contract addresses */
