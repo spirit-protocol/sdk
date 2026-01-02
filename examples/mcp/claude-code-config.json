@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "spirit-protocol": {
+      "command": "npx",
+      "args": ["-y", "@spirit-protocol/sdk", "spirit-mcp"],
+      "env": {
+        "SPIRIT_CHAIN_ID": "84532"
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "@spirit-protocol/sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript SDK for Spirit Protocol - economic sovereignty for AI agents",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -19,8 +19,12 @@
   },
   "files": [
     "dist",
-    "abis"
+    "abis",
+    "bin"
   ],
+  "bin": {
+    "spirit-mcp": "./bin/spirit-mcp.js"
+  },
   "scripts": {
     "build": "tsup src/index.ts src/mcp/index.ts --format cjs,esm --dts --clean",
     "dev": "tsup src/index.ts src/mcp/index.ts --format cjs,esm --dts --watch",
@@ -51,10 +55,10 @@
     "url": "https://github.com/spirit-protocol/spirit-sdk/issues"
   },
   "dependencies": {
-    "viem": "^2.21.0"
+    "viem": "^2.21.0",
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
     "@types/node": "^20.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0",

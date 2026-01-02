@@ -8,6 +8,8 @@ TypeScript SDK for Spirit Protocol — economic sovereignty infrastructure for A
 npm install @spirit-protocol/sdk
 ```
 
+> If npm install fails, install from GitHub: `npm install github:spirit-protocol/spirit-sdk`
+
 ## Quick Start
 
 ```typescript
@@ -103,9 +105,27 @@ const balance = await spirit.getTreasuryBalance('abraham');
 console.log('Treasury balance:', balance.native, 'wei');
 ```
 
-## MCP Server Integration
+## MCP Server
 
-The SDK includes an MCP server for Claude and other MCP-compatible agents.
+The SDK includes an MCP server for Claude Code and other MCP-compatible agents.
+
+### Quick Start (Claude Code)
+
+Add to your `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "spirit-protocol": {
+      "command": "npx",
+      "args": ["-y", "@spirit-protocol/sdk", "spirit-mcp"],
+      "env": {
+        "SPIRIT_CHAIN_ID": "84532"
+      }
+    }
+  }
+}
+```
 
 ### Available Tools
 
@@ -114,9 +134,15 @@ The SDK includes an MCP server for Claude and other MCP-compatible agents.
 | `spirit_get_agent` | Get agent registration info |
 | `spirit_register` | Register a new agent |
 | `spirit_balance` | Check treasury balance |
-| `spirit_route_revenue` | Route revenue through split |
 | `spirit_evaluate` | Self-assessment for unregistered agents |
-| `spirit_update_status` | Update agent status |
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SPIRIT_CHAIN_ID` | Chain ID (84532=testnet, 8453=mainnet) | 84532 |
+| `SPIRIT_PRIVATE_KEY` | Private key for write operations | - |
+| `SPIRIT_RPC_URL` | Custom RPC URL | Chain default |
 
 ### Usage with Claude Agent SDK
 
@@ -146,18 +172,17 @@ async function handleTool(name: string) {
 }
 ```
 
-See [examples/claude-agent-sdk](./examples/claude-agent-sdk) for complete examples.
+See [examples/mcp](./examples/mcp) for Claude Code configuration.
 
 ## Contract Addresses
 
-### Base Sepolia (Testnet)
+### Base Sepolia (Testnet) — LIVE
 
-**Core Contracts (required for SDK):**
-
-| Contract | Address | Status |
-|----------|---------|--------|
-| SpiritRegistry | `TBD` | Pending deployment |
-| RoyaltyRouter | `TBD` | Pending deployment |
+| Contract | Address | Basescan |
+|----------|---------|----------|
+| SpiritRegistry | `0x4a0e642e9aec25c5856987e95c0410ae10e8de5e` | [View](https://sepolia.basescan.org/address/0x4a0e642e9aec25c5856987e95c0410ae10e8de5e) |
+| RoyaltyRouter | `0x271bf11777ff7cbb9d938d2122d01493f6e9fc21` | [View](https://sepolia.basescan.org/address/0x271bf11777ff7cbb9d938d2122d01493f6e9fc21) |
+| ProtocolTreasury | `0xe4951bEE6FA86B809655922f610FF74C0E33416C` | [View](https://sepolia.basescan.org/address/0xe4951bEE6FA86B809655922f610FF74C0E33416C) |
 
 **Layer 2 Contracts (staking, tokens):**
 
@@ -167,18 +192,7 @@ See [examples/claude-agent-sdk](./examples/claude-agent-sdk) for complete exampl
 | SpiritFactory | `0x53B9db3DCF3a69a0F62c44b19a6c37149b7fB93b` |
 | StakingPool | `0xBBC3C7dc9151FFDc97e04E84Ad0fE91aF91D9DeE` |
 
-**Important:** Until SpiritRegistry and RoyaltyRouter are deployed, you must provide addresses via config:
-
-```typescript
-const spirit = new SpiritClient({
-  chainId: 84532,
-  privateKey: process.env.PRIVATE_KEY,
-  contracts: {
-    registry: '0x...', // Your deployed SpiritRegistry
-    router: '0x...',   // Your deployed RoyaltyRouter
-  },
-});
-```
+These addresses are the defaults for `chainId: 84532`. No manual configuration needed for testnet.
 
 ### Base Mainnet
 

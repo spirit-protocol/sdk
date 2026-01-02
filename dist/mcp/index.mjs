@@ -1,6 +1,6 @@
 import {
   SpiritClient
-} from "../chunk-TTKW6T2B.mjs";
+} from "../chunk-DQNFIEKZ.mjs";
 
 // src/mcp/tools.ts
 var SPIRIT_TOOLS = [
