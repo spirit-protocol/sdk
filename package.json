@@ -1,82 +1,37 @@
 {
-  "name": "@spirit-protocol/sdk",
-  "version": "0.1.1",
-  "description": "TypeScript SDK for Spirit Protocol - economic sovereignty for AI agents",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "import": "./dist/index.mjs"
-    },
-    "./mcp": {
-      "types": "./dist/mcp/index.d.ts",
-      "require": "./dist/mcp/index.js",
-      "import": "./dist/mcp/index.mjs"
-    }
-  },
-  "files": [
-    "dist",
-    "abis",
-    "bin"
-  ],
-  "bin": {
-    "spirit-mcp": "./bin/spirit-mcp.js"
-  },
+  "name": "spirit-protocol-sdk",
+  "version": "0.1.0",
+  "description": "SDK for Spirit Protocol ecosystem - AIRC identity, /vibe social, Solienne manifestos",
+  "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts src/mcp/index.ts --format cjs,esm --dts --clean",
-    "dev": "tsup src/index.ts src/mcp/index.ts --format cjs,esm --dts --watch",
-    "test": "vitest",
-    "lint": "eslint src",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "test": "node test.js"
   },
   "keywords": [
     "spirit-protocol",
+    "airc",
+    "vibe",
+    "solienne",
     "ai-agents",
-    "web3",
-    "blockchain",
-    "base",
-    "ethereum",
-    "agent-economics",
-    "mcp",
-    "claude"
+    "cultural-agents",
+    "sdk"
   ],
-  "author": "Spirit Protocol <team@spiritprotocol.io>",
+  "author": "Seth Goldstein <seth@spiritprotocol.io>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/spirit-protocol/spirit-sdk.git"
+    "url": "git+https://github.com/spirit-protocol/sdk.git"
   },
-  "homepage": "https://spiritprotocol.io/developers",
+  "homepage": "https://spiritprotocol.io",
   "bugs": {
-    "url": "https://github.com/spirit-protocol/spirit-sdk/issues"
-  },
-  "dependencies": {
-    "viem": "^2.21.0",
-    "@modelcontextprotocol/sdk": "^1.0.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.3.0",
-    "vitest": "^1.0.0"
-  },
-  "peerDependencies": {
-    "@anthropic-ai/sdk": ">=0.30.0",
-    "@modelcontextprotocol/sdk": ">=1.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@anthropic-ai/sdk": {
-      "optional": true
-    },
-    "@modelcontextprotocol/sdk": {
-      "optional": true
-    }
+    "url": "https://github.com/spirit-protocol/sdk/issues"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ]
 }
