@@ -2,6 +2,7 @@
  * Spirit Protocol MCP Tool Definitions
  *
  * These tools are exposed to AI agents via the Model Context Protocol.
+ * All agent lookups use numeric agentId (uint256), not string spiritId.
  */
 
 /** Tool names for Spirit Protocol MCP server */
@@ -10,55 +11,46 @@ export type SpiritToolName =
   | 'spirit_register'
   | 'spirit_balance'
   | 'spirit_route_revenue'
-  | 'spirit_evaluate'
-  | 'spirit_update_status';
+  | 'spirit_evaluate';
 
 /** Spirit Protocol MCP tool definitions */
 export const SPIRIT_TOOLS = [
   {
     name: 'spirit_get_agent' as const,
     description:
-      'Get information about a Spirit Protocol registered agent, including treasury address, revenue split, and status.',
+      'Get information about a Spirit Protocol registered agent by its numeric agentId, including treasury address, revenue config, and URI.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        spiritId: {
-          type: 'string',
-          description: 'The unique identifier of the agent (e.g., "abraham", "solienne")',
+        agentId: {
+          type: 'number',
+          description: 'The numeric agent ID (ERC-721 token ID, e.g. 1, 2, 3)',
         },
       },
-      required: ['spiritId'],
+      required: ['agentId'],
     },
   },
   {
     name: 'spirit_register' as const,
     description:
-      'Register a new agent with Spirit Protocol. This creates an onchain identity with a treasury and enables the 25/25/25/25 revenue split.',
+      'Register a new Spirit agent. Creates an ERC-8004 identity with treasury and the 25/25/25/25 revenue split in one transaction.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        spiritId: {
+        agentURI: {
           type: 'string',
-          description: 'Unique identifier for the agent (lowercase, alphanumeric)',
+          description: 'URI pointing to agent registration JSON (IPFS or HTTPS)',
         },
-        trainer: {
+        artist: {
           type: 'string',
-          description: 'Ethereum address of the trainer/creator who will receive 25% of revenue',
+          description: 'Ethereum address of the artist/creator (becomes NFT owner and initial treasury)',
         },
         platform: {
           type: 'string',
           description: 'Ethereum address of the platform that will receive 25% of revenue',
         },
-        treasury: {
-          type: 'string',
-          description: 'Ethereum address of the agent treasury (typically a Safe multisig)',
-        },
-        metadataURI: {
-          type: 'string',
-          description: 'URI pointing to agent metadata (IPFS or HTTPS)',
-        },
       },
-      required: ['spiritId', 'trainer', 'platform', 'treasury', 'metadataURI'],
+      required: ['agentURI', 'artist', 'platform'],
     },
   },
   {
@@ -68,30 +60,30 @@ export const SPIRIT_TOOLS = [
     inputSchema: {
       type: 'object' as const,
       properties: {
-        spiritId: {
-          type: 'string',
-          description: 'The unique identifier of the agent',
+        agentId: {
+          type: 'number',
+          description: 'The numeric agent ID',
         },
       },
-      required: ['spiritId'],
+      required: ['agentId'],
     },
   },
   {
     name: 'spirit_route_revenue' as const,
     description:
-      'Route revenue through Spirit Protocol, automatically splitting it 25/25/25/25 between creator, agent, platform, and protocol.',
+      'Route revenue through Spirit Protocol, automatically splitting it 25/25/25/25 between artist, agent, platform, and protocol.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        spiritId: {
-          type: 'string',
-          description: 'The agent to route revenue for',
+        agentId: {
+          type: 'number',
+          description: 'The numeric agent ID to route revenue for',
         },
         amount: {
           type: 'string',
           description: 'Amount in smallest units (wei for ETH, raw units for ERC20)',
         },
-        currency: {
+        token: {
           type: 'string',
           description:
             'Token address for ERC20 payments, or "ETH" for native payments. Defaults to ETH.',
@@ -102,7 +94,7 @@ export const SPIRIT_TOOLS = [
             'Token decimals for formatting (18 for ETH, 6 for USDC). Defaults to 18 for ETH, 6 for ERC20.',
         },
       },
-      required: ['spiritId', 'amount'],
+      required: ['agentId', 'amount'],
     },
   },
   {
@@ -130,26 +122,6 @@ export const SPIRIT_TOOLS = [
         },
       },
       required: ['hasRevenue', 'needsPersistence', 'wantsAutonomy'],
-    },
-  },
-  {
-    name: 'spirit_update_status' as const,
-    description:
-      'Update the status of a registered agent. Status can be Active (0), Paused (1), or Graduated (2).',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        spiritId: {
-          type: 'string',
-          description: 'The unique identifier of the agent',
-        },
-        status: {
-          type: 'number',
-          description: 'New status: 0 = Active, 1 = Paused, 2 = Graduated',
-          enum: [0, 1, 2],
-        },
-      },
-      required: ['spiritId', 'status'],
     },
   },
 ] as const;

@@ -8,7 +8,7 @@
  *   spirit-mcp
  *
  * Environment variables:
- *   SPIRIT_CHAIN_ID     - Chain ID (84532 for testnet, 8453 for mainnet)
+ *   SPIRIT_CHAIN_ID     - Chain ID (8453 for mainnet, 84532 for testnet)
  *   SPIRIT_PRIVATE_KEY  - Private key for write operations (optional)
  *   SPIRIT_RPC_URL      - Custom RPC URL (optional)
  */
@@ -18,13 +18,13 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
 // Import Spirit SDK
-const { SpiritClient } = require('../dist/index.js');
+const { SpiritClient, ZERO_ADDRESS } = require('../dist/index.js');
 const { SPIRIT_TOOLS } = require('../dist/mcp/index.js');
 const { formatEther } = require('viem');
 
 // Configuration from environment
 const config = {
-  chainId: parseInt(process.env.SPIRIT_CHAIN_ID || '84532'),
+  chainId: parseInt(process.env.SPIRIT_CHAIN_ID || '8453'),
   privateKey: process.env.SPIRIT_PRIVATE_KEY,
   rpcUrl: process.env.SPIRIT_RPC_URL,
 };
@@ -50,31 +50,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'spirit_get_agent': {
-        const agent = await client.getAgent(args.spiritId);
+        const agentId = BigInt(args.agentId);
+        const agent = await client.getAgent(agentId);
         if (!agent) {
-          return { content: [{ type: 'text', text: `Agent "${args.spiritId}" not found.` }] };
+          return { content: [{ type: 'text', text: `Agent #${args.agentId} not found.` }] };
         }
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
-              spiritId: agent.spiritId,
-              trainer: agent.trainer,
+              agentId: agent.agentId.toString(),
+              owner: agent.owner,
+              agentURI: agent.agentURI,
+              artist: agent.artist,
               platform: agent.platform,
               treasury: agent.treasury,
-              status: ['Active', 'Paused', 'Graduated'][agent.status],
+              revenueConfig: {
+                artist: `${agent.revenueConfig.artistBps / 100}%`,
+                agent: `${agent.revenueConfig.agentBps / 100}%`,
+                platform: `${agent.revenueConfig.platformBps / 100}%`,
+                protocol: `${agent.revenueConfig.protocolBps / 100}%`,
+              },
             }, null, 2)
           }]
         };
       }
 
       case 'spirit_balance': {
-        const balance = await client.getTreasuryBalance(args.spiritId);
+        const agentId = BigInt(args.agentId);
+        const balance = await client.getTreasuryBalance(agentId);
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
-              spiritId: args.spiritId,
+              agentId: args.agentId,
               balance: {
                 wei: balance.native.toString(),
                 eth: formatEther(balance.native),
@@ -91,22 +100,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             isError: true
           };
         }
-        const result = await client.registerAgent({
-          spiritId: args.spiritId,
-          trainer: args.trainer,
+        const result = await client.registerSpirit({
+          agentURI: args.agentURI,
+          artist: args.artist,
           platform: args.platform,
-          treasury: args.treasury,
-          metadataURI: args.metadataURI,
+          treasuryOwners: [args.artist],
+          treasuryThreshold: 1n,
         });
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
               success: true,
-              spiritKey: result.spiritKey,
-              tokenId: result.registryTokenId.toString(),
+              agentId: result.agentId.toString(),
               txHash: result.txHash,
               explorer: client.getExplorerUrl(result.txHash),
+            }, null, 2)
+          }]
+        };
+      }
+
+      case 'spirit_route_revenue': {
+        if (!client.hasWallet()) {
+          return {
+            content: [{ type: 'text', text: 'Error: SPIRIT_PRIVATE_KEY required for revenue routing.' }],
+            isError: true
+          };
+        }
+        const agentId = BigInt(args.agentId);
+        const amount = BigInt(args.amount);
+        const isNative = !args.token || args.token.toLowerCase() === 'eth';
+        const token = isNative ? ZERO_ADDRESS : args.token;
+        const event = await client.routeRevenue({ agentId, token, amount });
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              agentId: args.agentId,
+              amount: event.amount.toString(),
+              txHash: event.txHash,
             }, null, 2)
           }]
         };

@@ -2,6 +2,7 @@
  * Spirit Protocol SDK Constants
  *
  * Contract addresses, chain configuration, and ABIs
+ * Matches mainnet SpiritRegistry deployed Feb 3, 2026 on Base (chainId 8453)
  */
 
 import type { Address, SpiritChainId } from './types';
@@ -33,17 +34,16 @@ export const CHAIN_CONFIG = {
 
 /** Testnet (Base Sepolia) contract addresses */
 export const TESTNET_ADDRESSES: Record<string, Address> = {
-  // Layer 1: Minimal (spirit-onboarding-demo) - Deployed Jan 2, 2026
-  SpiritRegistry: '0x4a0e642e9aec25c5856987e95c0410ae10e8de5e',
-  RoyaltyRouter: '0x271bf11777ff7cbb9d938d2122d01493f6e9fc21',
+  // SpiritRegistry (spirit-contracts-core) — Base Sepolia
+  SpiritRegistry: '0x98f61d33bFD87a2e73aEf4a1bf1c8E534Ad0d5Aa',
 
-  // Layer 2: Full (spirit-contracts-core)
-  SpiritToken: '0xC3FD6880fC602d999f64C4a38dF51BEB6e1b654B',
-  SpiritFactory: '0x53B9db3DCF3a69a0F62c44b19a6c37149b7fB93b',
-  StakingPool: '0xBBC3C7dc9151FFDc97e04E84Ad0fE91aF91D9DeE',
-  RewardController: '0xD91CCC7eeA5c0aD0f6e5E2c6E5c08bdF5C1cA1b0',
+  // Not yet deployed on testnet
+  SpiritToken: '0x0000000000000000000000000000000000000000',
+  SpiritFactory: '0x0000000000000000000000000000000000000000',
+  StakingPool: '0x0000000000000000000000000000000000000000',
+  RewardController: '0x0000000000000000000000000000000000000000',
 
-  // Protocol Treasury (for 25% protocol share)
+  // Protocol Treasury
   ProtocolTreasury: '0xe4951bEE6FA86B809655922f610FF74C0E33416C',
 };
 
@@ -51,7 +51,6 @@ export const TESTNET_ADDRESSES: Record<string, Address> = {
 export const MAINNET_ADDRESSES: Record<string, Address> = {
   // SpiritRegistry deployed Feb 3, 2026 — Base Mainnet (chainId 8453)
   SpiritRegistry: '0xF2709ceF1Cf4893ed78D3220864428b32b12dFb9',
-  RoyaltyRouter: '0x0000000000000000000000000000000000000000', // TODO: Deploy
   SpiritToken: '0x0000000000000000000000000000000000000000',   // TODO: TGE
   SpiritFactory: '0x0000000000000000000000000000000000000000', // TODO: TGE
   StakingPool: '0x0000000000000000000000000000000000000000',   // TODO: TGE
@@ -68,44 +67,35 @@ export function getAddresses(chainId: SpiritChainId): Record<string, Address> {
 // Contract ABIs (minimal, for SDK operations)
 // ============================================================================
 
-/** SpiritRegistry ABI (read/write operations) */
+/**
+ * SpiritRegistry ABI — matches mainnet contract at 0xF2709ceF1Cf4893ed78D3220864428b32b12dFb9
+ *
+ * SpiritRegistry extends ERC8004IdentityRegistry with treasury, revenue routing,
+ * and token creation primitives. All lookups use uint256 agentId (not string spiritId).
+ *
+ * Revenue routing is built into the registry (no separate RoyaltyRouter contract).
+ */
 export const SPIRIT_REGISTRY_ABI = [
-  // Read functions
+  // ==========================================================================
+  // Read functions (SpiritRegistry)
+  // ==========================================================================
   {
     type: 'function',
-    name: 'getAgent',
-    inputs: [{ name: 'spiritId', type: 'string' }],
+    name: 'getSpiritConfig',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
     outputs: [
       {
-        name: 'record',
+        name: '',
         type: 'tuple',
         components: [
-          { name: 'spiritId', type: 'string' },
-          { name: 'registryTokenId', type: 'uint256' },
-          { name: 'trainer', type: 'address' },
-          { name: 'platform', type: 'address' },
           { name: 'treasury', type: 'address' },
-          { name: 'metadataURI', type: 'string' },
-          {
-            name: 'split',
-            type: 'tuple',
-            components: [
-              { name: 'artistBps', type: 'uint16' },
-              { name: 'agentBps', type: 'uint16' },
-              { name: 'platformBps', type: 'uint16' },
-              { name: 'protocolBps', type: 'uint16' },
-            ],
-          },
-          {
-            name: 'economics',
-            type: 'tuple',
-            components: [
-              { name: 'childToken', type: 'address' },
-              { name: 'stakingPool', type: 'address' },
-              { name: 'router', type: 'address' },
-            ],
-          },
-          { name: 'status', type: 'uint8' },
+          { name: 'childToken', type: 'address' },
+          { name: 'stakingPool', type: 'address' },
+          { name: 'lpPosition', type: 'address' },
+          { name: 'artist', type: 'address' },
+          { name: 'platform', type: 'address' },
+          { name: 'createdAt', type: 'uint256' },
+          { name: 'hasToken', type: 'bool' },
         ],
       },
     ],
@@ -113,14 +103,11 @@ export const SPIRIT_REGISTRY_ABI = [
   },
   {
     type: 'function',
-    name: 'getRecipients',
-    inputs: [{ name: 'spiritId', type: 'string' }],
+    name: 'getRevenueConfig',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
     outputs: [
-      { name: 'trainer', type: 'address' },
-      { name: 'platform', type: 'address' },
-      { name: 'treasury', type: 'address' },
       {
-        name: 'split',
+        name: '',
         type: 'tuple',
         components: [
           { name: 'artistBps', type: 'uint16' },
@@ -134,128 +121,46 @@ export const SPIRIT_REGISTRY_ABI = [
   },
   {
     type: 'function',
-    name: 'resolveKey',
-    inputs: [{ name: 'spiritId', type: 'string' }],
-    outputs: [{ name: '', type: 'bytes32' }],
-    stateMutability: 'pure',
-  },
-  {
-    type: 'function',
-    name: 'nextTokenId',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  // Write functions
-  {
-    type: 'function',
-    name: 'registerAgent',
-    inputs: [
-      { name: 'spiritId', type: 'string' },
-      { name: 'trainer', type: 'address' },
-      { name: 'platform', type: 'address' },
-      { name: 'treasury', type: 'address' },
-      { name: 'metadataURI', type: 'string' },
-      {
-        name: 'split',
-        type: 'tuple',
-        components: [
-          { name: 'artistBps', type: 'uint16' },
-          { name: 'agentBps', type: 'uint16' },
-          { name: 'platformBps', type: 'uint16' },
-          { name: 'protocolBps', type: 'uint16' },
-        ],
-      },
-    ],
-    outputs: [
-      { name: 'spiritKey', type: 'bytes32' },
-      { name: 'registryTokenId', type: 'uint256' },
-    ],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'updateMetadata',
-    inputs: [
-      { name: 'spiritId', type: 'string' },
-      { name: 'metadataURI', type: 'string' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'updateStatus',
-    inputs: [
-      { name: 'spiritId', type: 'string' },
-      { name: 'status', type: 'uint8' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'recordEvent',
-    inputs: [
-      { name: 'spiritId', type: 'string' },
-      { name: 'eventType', type: 'bytes32' },
-      { name: 'contentHash', type: 'bytes32' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  // Events
-  {
-    type: 'event',
-    name: 'AgentRegistered',
-    inputs: [
-      { name: 'spiritKey', type: 'bytes32', indexed: true },
-      { name: 'spiritId', type: 'string', indexed: false },
-      { name: 'registryTokenId', type: 'uint256', indexed: false },
-      { name: 'trainer', type: 'address', indexed: false },
-      { name: 'platform', type: 'address', indexed: false },
-      { name: 'treasury', type: 'address', indexed: false },
-      {
-        name: 'split',
-        type: 'tuple',
-        indexed: false,
-        components: [
-          { name: 'artistBps', type: 'uint16' },
-          { name: 'agentBps', type: 'uint16' },
-          { name: 'platformBps', type: 'uint16' },
-          { name: 'protocolBps', type: 'uint16' },
-        ],
-      },
-      { name: 'metadataURI', type: 'string', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'StatusUpdated',
-    inputs: [
-      { name: 'spiritKey', type: 'bytes32', indexed: true },
-      { name: 'status', type: 'uint8', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'ProvenanceRecorded',
-    inputs: [
-      { name: 'spiritKey', type: 'bytes32', indexed: true },
-      { name: 'eventType', type: 'bytes32', indexed: true },
-      { name: 'contentHash', type: 'bytes32', indexed: false },
-    ],
-  },
-] as const;
-
-/** RoyaltyRouter ABI (read/write operations) */
-export const ROYALTY_ROUTER_ABI = [
-  // Read functions
-  {
-    type: 'function',
-    name: 'registry',
-    inputs: [],
+    name: 'getTreasury',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
     outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getChildToken',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getStakingPool',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'hasSpiritAttached',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getExternalAgent',
+    inputs: [{ name: 'spiritId', type: 'uint256' }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'registry', type: 'address' },
+          { name: 'agentId', type: 'uint256' },
+        ],
+      },
+    ],
     stateMutability: 'view',
   },
   {
@@ -267,47 +172,242 @@ export const ROYALTY_ROUTER_ABI = [
   },
   {
     type: 'function',
-    name: 'acceptedCurrency',
-    inputs: [{ name: '', type: 'address' }],
+    name: 'defaultRevenueConfig',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'artistBps', type: 'uint16' },
+          { name: 'agentBps', type: 'uint16' },
+          { name: 'platformBps', type: 'uint16' },
+          { name: 'protocolBps', type: 'uint16' },
+        ],
+      },
+    ],
+    stateMutability: 'pure',
+  },
+
+  // ==========================================================================
+  // Read functions (ERC8004IdentityRegistry)
+  // ==========================================================================
+  {
+    type: 'function',
+    name: 'ownerOf',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'agentURI',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'agentWalletOf',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'exists',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
     outputs: [{ name: '', type: 'bool' }],
     stateMutability: 'view',
   },
-  // Write functions
+  {
+    type: 'function',
+    name: 'getMetadata',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'key', type: 'string' },
+    ],
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+  },
+
+  // ==========================================================================
+  // Write functions (SpiritRegistry)
+  // ==========================================================================
+  {
+    type: 'function',
+    name: 'registerSpirit',
+    inputs: [
+      { name: 'agentURI_', type: 'string' },
+      { name: 'artist', type: 'address' },
+      { name: 'platform', type: 'address' },
+      { name: 'treasuryOwners', type: 'address[]' },
+      { name: 'treasuryThreshold', type: 'uint256' },
+    ],
+    outputs: [{ name: 'agentId', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'attachSpirit',
+    inputs: [
+      { name: 'externalRegistry', type: 'address' },
+      { name: 'externalAgentId', type: 'uint256' },
+      { name: 'artist', type: 'address' },
+      { name: 'platform', type: 'address' },
+    ],
+    outputs: [{ name: 'spiritId', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     name: 'routeRevenue',
     inputs: [
-      { name: 'spiritId', type: 'string' },
-      { name: 'currency', type: 'address' },
+      { name: 'agentId', type: 'uint256' },
+      { name: 'token', type: 'address' },
       { name: 'amount', type: 'uint256' },
-      { name: 'metadataHash', type: 'bytes32' },
+    ],
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    name: 'updateTreasury',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'newTreasury', type: 'address' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
   },
   {
     type: 'function',
-    name: 'routeRevenueNative',
+    name: 'setRevenueConfig',
     inputs: [
-      { name: 'spiritId', type: 'string' },
-      { name: 'metadataHash', type: 'bytes32' },
+      { name: 'agentId', type: 'uint256' },
+      {
+        name: 'config',
+        type: 'tuple',
+        components: [
+          { name: 'artistBps', type: 'uint16' },
+          { name: 'agentBps', type: 'uint16' },
+          { name: 'platformBps', type: 'uint16' },
+          { name: 'protocolBps', type: 'uint16' },
+        ],
+      },
     ],
     outputs: [],
-    stateMutability: 'payable',
+    stateMutability: 'nonpayable',
   },
-  // Events
+
+  // ==========================================================================
+  // Write functions (ERC8004IdentityRegistry)
+  // ==========================================================================
+  {
+    type: 'function',
+    name: 'setAgentURI',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'newURI', type: 'string' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'setMetadata',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'key', type: 'string' },
+      { name: 'value', type: 'string' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+
+  // ==========================================================================
+  // Events (SpiritRegistry)
+  // ==========================================================================
+  {
+    type: 'event',
+    name: 'SpiritRegistered',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'treasury', type: 'address', indexed: true },
+      { name: 'artist', type: 'address', indexed: true },
+      { name: 'platform', type: 'address', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'SpiritAttached',
+    inputs: [
+      { name: 'spiritId', type: 'uint256', indexed: true },
+      { name: 'externalRegistry', type: 'address', indexed: true },
+      { name: 'externalAgentId', type: 'uint256', indexed: true },
+    ],
+  },
   {
     type: 'event',
     name: 'RevenueRouted',
     inputs: [
-      { name: 'spiritKey', type: 'bytes32', indexed: true },
-      { name: 'currency', type: 'address', indexed: true },
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'token', type: 'address', indexed: true },
       { name: 'amount', type: 'uint256', indexed: false },
       { name: 'artistAmount', type: 'uint256', indexed: false },
       { name: 'agentAmount', type: 'uint256', indexed: false },
       { name: 'platformAmount', type: 'uint256', indexed: false },
       { name: 'protocolAmount', type: 'uint256', indexed: false },
-      { name: 'metadataHash', type: 'bytes32', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'TreasuryUpdated',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'oldTreasury', type: 'address', indexed: false },
+      { name: 'newTreasury', type: 'address', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'ChildTokenCreated',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'childToken', type: 'address', indexed: true },
+      { name: 'stakingPool', type: 'address', indexed: true },
+      { name: 'lpPosition', type: 'address', indexed: false },
+    ],
+  },
+
+  // ==========================================================================
+  // Events (ERC8004IdentityRegistry)
+  // ==========================================================================
+  {
+    type: 'event',
+    name: 'Registered',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'agentURI', type: 'string', indexed: false },
+      { name: 'owner', type: 'address', indexed: true },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'URIUpdated',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'newURI', type: 'string', indexed: false },
+      { name: 'updatedBy', type: 'address', indexed: true },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'AgentWalletSet',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'oldWallet', type: 'address', indexed: true },
+      { name: 'newWallet', type: 'address', indexed: true },
     ],
   },
 ] as const;

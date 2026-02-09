@@ -9,7 +9,7 @@
  * import { createSpiritMCPServer } from '@spirit-protocol/sdk/mcp';
  *
  * const server = createSpiritMCPServer({
- *   chainId: 84532,
+ *   chainId: 8453,
  *   privateKey: process.env.AGENT_PRIVATE_KEY,
  * });
  *

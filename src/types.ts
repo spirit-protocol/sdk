@@ -1,7 +1,8 @@
 /**
  * Spirit Protocol SDK Type Definitions
  *
- * TypeScript types that mirror the Solidity contracts
+ * TypeScript types matching the mainnet SpiritRegistry contract
+ * (ERC8004IdentityRegistry + ISpiritRegistry)
  */
 
 // ============================================================================
@@ -17,19 +18,12 @@ export type Hash = `0x${string}`;
 /** Chain IDs supported by Spirit Protocol */
 export type SpiritChainId = 8453 | 84532; // Base mainnet | Base Sepolia
 
-/** Agent status enum (mirrors SpiritRegistry.Status) */
-export enum AgentStatus {
-  Active = 0,
-  Paused = 1,
-  Graduated = 2,
-}
-
 // ============================================================================
-// Split Configuration
+// Revenue Configuration
 // ============================================================================
 
-/** Revenue split configuration in basis points (bps) */
-export interface SplitConfig {
+/** Revenue split configuration in basis points (bps), must sum to 10000 */
+export interface RevenueConfig {
   /** Artist/creator share in basis points (25% = 2500) */
   artistBps: number;
   /** Agent treasury share in basis points (25% = 2500) */
@@ -40,8 +34,8 @@ export interface SplitConfig {
   protocolBps: number;
 }
 
-/** Default 25/25/25/25 split */
-export const DEFAULT_SPLIT: SplitConfig = {
+/** Default 25/25/25/25 revenue split */
+export const DEFAULT_REVENUE_CONFIG: RevenueConfig = {
   artistBps: 2500,
   agentBps: 2500,
   platformBps: 2500,
@@ -52,60 +46,57 @@ export const DEFAULT_SPLIT: SplitConfig = {
 // Agent Types
 // ============================================================================
 
-/** Economic configuration for an agent */
-export interface AgentEconomics {
-  /** Child token address (agent-specific token) */
-  childToken: Address;
-  /** Staking pool address */
-  stakingPool: Address;
-  /** Royalty router address */
-  router: Address;
-}
-
-/** Full agent record from registry */
+/**
+ * Full agent record from SpiritRegistry
+ *
+ * Composite type built from getSpiritConfig(), getRevenueConfig(),
+ * ownerOf(), and agentURI() calls.
+ */
 export interface SpiritAgent {
-  /** Unique agent identifier (human-readable) */
-  spiritId: string;
-  /** Registry token ID (NFT) */
-  registryTokenId: bigint;
-  /** Trainer/creator wallet address */
-  trainer: Address;
-  /** Platform wallet address */
-  platform: Address;
-  /** Agent treasury address (typically a Safe) */
+  /** Numeric agent ID (ERC-721 token ID) */
+  agentId: bigint;
+  /** Owner address (controls identity) */
+  owner: Address;
+  /** Agent URI (IPFS or HTTPS pointing to registration JSON) */
+  agentURI: string;
+  /** Treasury address (controls funds, also set as agentWallet) */
   treasury: Address;
-  /** Metadata URI (IPFS or HTTPS) */
-  metadataURI: string;
-  /** Revenue split configuration */
-  split: SplitConfig;
-  /** Economic contracts configuration */
-  economics: AgentEconomics;
-  /** Current agent status */
-  status: AgentStatus;
+  /** Child token address (address(0) if none) */
+  childToken: Address;
+  /** Staking pool address (address(0) if none) */
+  stakingPool: Address;
+  /** LP position address (address(0) if none) */
+  lpPosition: Address;
+  /** Artist/creator address */
+  artist: Address;
+  /** Platform address */
+  platform: Address;
+  /** Creation timestamp */
+  createdAt: bigint;
+  /** Whether child token has been created */
+  hasToken: boolean;
+  /** Revenue routing configuration */
+  revenueConfig: RevenueConfig;
 }
 
-/** Parameters for registering a new agent */
-export interface RegisterAgentParams {
-  /** Unique agent identifier */
-  spiritId: string;
-  /** Trainer/creator wallet address */
-  trainer: Address;
-  /** Platform wallet address */
+/** Parameters for registering a new Spirit agent */
+export interface RegisterSpiritParams {
+  /** URI pointing to agent registration JSON (IPFS or HTTPS) */
+  agentURI: string;
+  /** Artist/creator address (becomes ERC-8004 owner) */
+  artist: Address;
+  /** Platform address */
   platform: Address;
-  /** Agent treasury address */
-  treasury: Address;
-  /** Metadata URI */
-  metadataURI: string;
-  /** Revenue split (defaults to 25/25/25/25) */
-  split?: SplitConfig;
+  /** Treasury multisig owners (ignored in MVP, pass [artist]) */
+  treasuryOwners: Address[];
+  /** Treasury multisig threshold (ignored in MVP, pass 1) */
+  treasuryThreshold: bigint;
 }
 
-/** Result of agent registration */
-export interface RegisterAgentResult {
-  /** Computed spirit key (keccak256 hash of spiritId) */
-  spiritKey: Hash;
-  /** Registry token ID */
-  registryTokenId: bigint;
+/** Result of Spirit agent registration */
+export interface RegisterSpiritResult {
+  /** Assigned agent ID (ERC-721 token ID) */
+  agentId: bigint;
   /** Transaction hash */
   txHash: Hash;
 }
@@ -114,12 +105,12 @@ export interface RegisterAgentResult {
 // Revenue Types
 // ============================================================================
 
-/** Revenue routing event */
+/** Revenue routing event data */
 export interface RevenueEvent {
-  /** Spirit key (indexed) */
-  spiritKey: Hash;
-  /** Currency address (address(0) for native ETH) */
-  currency: Address;
+  /** Agent ID */
+  agentId: bigint;
+  /** Token address (address(0) for native ETH) */
+  token: Address;
   /** Total amount routed */
   amount: bigint;
   /** Amount sent to artist/creator */
@@ -130,34 +121,20 @@ export interface RevenueEvent {
   platformAmount: bigint;
   /** Amount sent to protocol treasury */
   protocolAmount: bigint;
-  /** Optional metadata hash */
-  metadataHash: Hash;
   /** Transaction hash */
   txHash: Hash;
   /** Block timestamp */
   timestamp: number;
 }
 
-/** Parameters for routing revenue (ERC20) */
+/** Parameters for routing revenue */
 export interface RouteRevenueParams {
-  /** Agent identifier */
-  spiritId: string;
-  /** ERC20 token address */
-  currency: Address;
-  /** Amount to route */
+  /** Agent ID to route revenue for */
+  agentId: bigint;
+  /** Token address (ZERO_ADDRESS for native ETH) */
+  token: Address;
+  /** Amount to route (for ERC-20; ignored for ETH where msg.value is used) */
   amount: bigint;
-  /** Optional metadata hash */
-  metadataHash?: Hash;
-}
-
-/** Parameters for routing native ETH revenue */
-export interface RouteRevenueNativeParams {
-  /** Agent identifier */
-  spiritId: string;
-  /** Amount in wei (passed as msg.value) */
-  amount: bigint;
-  /** Optional metadata hash */
-  metadataHash?: Hash;
 }
 
 // ============================================================================
@@ -165,7 +142,7 @@ export interface RouteRevenueNativeParams {
 // ============================================================================
 
 /** SDK client configuration */
-export interface SpiritConfig {
+export interface SpiritClientConfig {
   /** Target chain ID */
   chainId: SpiritChainId;
   /** Custom RPC URL (optional, uses public RPC if not provided) */
@@ -175,7 +152,6 @@ export interface SpiritConfig {
   /** Custom contract addresses (optional, uses defaults) */
   contracts?: {
     registry?: Address;
-    router?: Address;
     spiritToken?: Address;
     stakingPool?: Address;
     factory?: Address;
@@ -186,56 +162,42 @@ export interface SpiritConfig {
 // Event Types (for listening)
 // ============================================================================
 
-/** Agent registered event */
-export interface AgentRegisteredEvent {
-  spiritKey: Hash;
-  spiritId: string;
-  registryTokenId: bigint;
-  trainer: Address;
-  platform: Address;
+/** SpiritRegistered event */
+export interface SpiritRegisteredEvent {
+  agentId: bigint;
   treasury: Address;
-  split: SplitConfig;
-  metadataURI: string;
+  artist: Address;
+  platform: Address;
 }
 
-/** Agent configured event (economic config set) */
-export interface AgentConfiguredEvent {
-  spiritKey: Hash;
-  childToken: Address;
-  stakingPool: Address;
-  router: Address;
+/** RevenueRouted event */
+export interface RevenueRoutedEvent {
+  agentId: bigint;
+  token: Address;
+  amount: bigint;
+  artistAmount: bigint;
+  agentAmount: bigint;
+  platformAmount: bigint;
+  protocolAmount: bigint;
 }
 
-/** Status updated event */
-export interface StatusUpdatedEvent {
-  spiritKey: Hash;
-  status: AgentStatus;
+/** TreasuryUpdated event */
+export interface TreasuryUpdatedEvent {
+  agentId: bigint;
+  oldTreasury: Address;
+  newTreasury: Address;
 }
 
-/** Provenance recorded event */
-export interface ProvenanceEvent {
-  spiritKey: Hash;
-  eventType: Hash;
-  contentHash: Hash;
+/** ERC8004 Registered event */
+export interface RegisteredEvent {
+  agentId: bigint;
+  agentURI: string;
+  owner: Address;
 }
 
 // ============================================================================
 // Utility Types
 // ============================================================================
-
-/** Filter for listing agents */
-export interface AgentFilter {
-  /** Filter by status */
-  status?: AgentStatus;
-  /** Filter by trainer address */
-  trainer?: Address;
-  /** Filter by platform address */
-  platform?: Address;
-  /** Pagination offset */
-  offset?: number;
-  /** Pagination limit */
-  limit?: number;
-}
 
 /** Balance information */
 export interface BalanceInfo {
@@ -243,20 +205,4 @@ export interface BalanceInfo {
   native: bigint;
   /** SPIRIT token balance (if applicable) */
   spirit?: bigint;
-  /** Agent token balance (if applicable) */
-  agentToken?: bigint;
-}
-
-/** Transaction receipt with Spirit-specific data */
-export interface SpiritTransactionReceipt {
-  /** Transaction hash */
-  hash: Hash;
-  /** Block number */
-  blockNumber: bigint;
-  /** Gas used */
-  gasUsed: bigint;
-  /** Transaction status */
-  status: 'success' | 'reverted';
-  /** Parsed Spirit events */
-  events: Array<RevenueEvent | AgentRegisteredEvent | StatusUpdatedEvent>;
 }

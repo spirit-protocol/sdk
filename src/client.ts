@@ -2,7 +2,10 @@
  * Spirit Protocol SDK - Main Client
  *
  * The SpiritClient provides the primary interface for interacting with
- * Spirit Protocol contracts on Base.
+ * Spirit Protocol's SpiritRegistry contract on Base.
+ *
+ * All lookups use uint256 agentId (not string spiritId).
+ * Revenue routing is built into the registry (no separate RoyaltyRouter).
  */
 
 import {
@@ -20,28 +23,24 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { base, baseSepolia } from 'viem/chains';
 
 import type {
-  SpiritConfig,
+  SpiritClientConfig,
   SpiritAgent,
-  RegisterAgentParams,
-  RegisterAgentResult,
+  RegisterSpiritParams,
+  RegisterSpiritResult,
   RevenueEvent,
   RouteRevenueParams,
-  RouteRevenueNativeParams,
+  RevenueConfig,
   BalanceInfo,
   Address,
   Hash,
-  SplitConfig,
-  AgentStatus,
 } from './types';
 
 import {
   CHAIN_CONFIG,
   getAddresses,
   SPIRIT_REGISTRY_ABI,
-  ROYALTY_ROUTER_ABI,
-  ZERO_HASH,
+  ZERO_ADDRESS,
 } from './constants';
-import { DEFAULT_SPLIT } from './types';
 
 // ============================================================================
 // Helper Functions
@@ -49,41 +48,6 @@ import { DEFAULT_SPLIT } from './types';
 
 function getChain(chainId: number): Chain {
   return chainId === 8453 ? base : baseSepolia;
-}
-
-function parseAgentRecord(raw: unknown): SpiritAgent {
-  const record = raw as {
-    spiritId: string;
-    registryTokenId: bigint;
-    trainer: Address;
-    platform: Address;
-    treasury: Address;
-    metadataURI: string;
-    split: { artistBps: number; agentBps: number; platformBps: number; protocolBps: number };
-    economics: { childToken: Address; stakingPool: Address; router: Address };
-    status: number;
-  };
-
-  return {
-    spiritId: record.spiritId,
-    registryTokenId: record.registryTokenId,
-    trainer: record.trainer,
-    platform: record.platform,
-    treasury: record.treasury,
-    metadataURI: record.metadataURI,
-    split: {
-      artistBps: record.split.artistBps,
-      agentBps: record.split.agentBps,
-      platformBps: record.split.platformBps,
-      protocolBps: record.split.protocolBps,
-    },
-    economics: {
-      childToken: record.economics.childToken,
-      stakingPool: record.economics.stakingPool,
-      router: record.economics.router,
-    },
-    status: record.status as AgentStatus,
-  };
 }
 
 // ============================================================================
@@ -95,16 +59,22 @@ function parseAgentRecord(raw: unknown): SpiritAgent {
  *
  * @example
  * ```typescript
- * // Read-only client
- * const client = new SpiritClient({ chainId: 84532 });
- * const agent = await client.getAgent('abraham');
+ * // Read-only client (mainnet)
+ * const client = new SpiritClient({ chainId: 8453 });
+ * const agent = await client.getAgent(2n); // Abraham
  *
  * // Write-enabled client
  * const client = new SpiritClient({
- *   chainId: 84532,
+ *   chainId: 8453,
  *   privateKey: '0x...',
  * });
- * const result = await client.registerAgent({ ... });
+ * const result = await client.registerSpirit({
+ *   agentURI: 'ipfs://...',
+ *   artist: '0x...',
+ *   platform: '0x...',
+ *   treasuryOwners: ['0x...'],
+ *   treasuryThreshold: 1n,
+ * });
  * ```
  */
 export class SpiritClient {
@@ -116,20 +86,15 @@ export class SpiritClient {
   private walletClient?: WalletClient<Transport, Chain, Account>;
   private account?: Account;
 
-  constructor(config: SpiritConfig) {
+  constructor(config: SpiritClientConfig) {
     this.chainId = config.chainId;
     this.chain = getChain(config.chainId);
 
-    // Start with default addresses for the chain
     this.addresses = { ...getAddresses(config.chainId) };
 
-    // Map user-friendly config keys to actual contract names
     if (config.contracts) {
       if (config.contracts.registry) {
         this.addresses.SpiritRegistry = config.contracts.registry;
-      }
-      if (config.contracts.router) {
-        this.addresses.RoyaltyRouter = config.contracts.router;
       }
       if (config.contracts.spiritToken) {
         this.addresses.SpiritToken = config.contracts.spiritToken;
@@ -164,94 +129,168 @@ export class SpiritClient {
   // ==========================================================================
 
   /**
-   * Get agent record by spiritId
+   * Get full agent record by agentId
+   *
+   * Combines data from getSpiritConfig(), getRevenueConfig(), ownerOf(),
+   * and agentURI() into a single SpiritAgent object.
    *
    * @returns Agent record if found, null if not registered
-   * @throws Error on network/RPC failures
    */
-  async getAgent(spiritId: string): Promise<SpiritAgent | null> {
-    const result = await this.publicClient.readContract({
+  async getAgent(agentId: bigint): Promise<SpiritAgent | null> {
+    const agentExists = await this.publicClient.readContract({
       address: this.addresses.SpiritRegistry,
       abi: SPIRIT_REGISTRY_ABI,
-      functionName: 'getAgent',
-      args: [spiritId],
-    });
+      functionName: 'exists',
+      args: [agentId],
+    }) as boolean;
 
-    const agent = parseAgentRecord(result);
-
-    // Check if agent exists (registryTokenId > 0)
-    if (agent.registryTokenId === 0n) {
+    if (!agentExists) {
       return null;
     }
 
-    return agent;
-  }
+    const [spiritConfig, revenueConfig, owner, uri] = await Promise.all([
+      this.publicClient.readContract({
+        address: this.addresses.SpiritRegistry,
+        abi: SPIRIT_REGISTRY_ABI,
+        functionName: 'getSpiritConfig',
+        args: [agentId],
+      }),
+      this.publicClient.readContract({
+        address: this.addresses.SpiritRegistry,
+        abi: SPIRIT_REGISTRY_ABI,
+        functionName: 'getRevenueConfig',
+        args: [agentId],
+      }),
+      this.publicClient.readContract({
+        address: this.addresses.SpiritRegistry,
+        abi: SPIRIT_REGISTRY_ABI,
+        functionName: 'ownerOf',
+        args: [agentId],
+      }),
+      this.publicClient.readContract({
+        address: this.addresses.SpiritRegistry,
+        abi: SPIRIT_REGISTRY_ABI,
+        functionName: 'agentURI',
+        args: [agentId],
+      }),
+    ]);
 
-  /**
-   * Get recipients and split configuration for an agent
-   *
-   * @throws Error on network/RPC failures or if agent not found
-   */
-  async getRecipients(spiritId: string): Promise<{
-    trainer: Address;
-    platform: Address;
-    treasury: Address;
-    split: SplitConfig;
-  }> {
-    const result = await this.publicClient.readContract({
-      address: this.addresses.SpiritRegistry,
-      abi: SPIRIT_REGISTRY_ABI,
-      functionName: 'getRecipients',
-      args: [spiritId],
-    }) as [Address, Address, Address, { artistBps: number; agentBps: number; platformBps: number; protocolBps: number }];
+    const config = spiritConfig as {
+      treasury: Address;
+      childToken: Address;
+      stakingPool: Address;
+      lpPosition: Address;
+      artist: Address;
+      platform: Address;
+      createdAt: bigint;
+      hasToken: boolean;
+    };
+
+    const rev = revenueConfig as {
+      artistBps: number;
+      agentBps: number;
+      platformBps: number;
+      protocolBps: number;
+    };
 
     return {
-      trainer: result[0],
-      platform: result[1],
-      treasury: result[2],
-      split: {
-        artistBps: result[3].artistBps,
-        agentBps: result[3].agentBps,
-        platformBps: result[3].platformBps,
-        protocolBps: result[3].protocolBps,
+      agentId,
+      owner: owner as Address,
+      agentURI: uri as string,
+      treasury: config.treasury,
+      childToken: config.childToken,
+      stakingPool: config.stakingPool,
+      lpPosition: config.lpPosition,
+      artist: config.artist,
+      platform: config.platform,
+      createdAt: config.createdAt,
+      hasToken: config.hasToken,
+      revenueConfig: {
+        artistBps: rev.artistBps,
+        agentBps: rev.agentBps,
+        platformBps: rev.platformBps,
+        protocolBps: rev.protocolBps,
       },
     };
   }
 
   /**
-   * Resolve spiritId to spiritKey (keccak256 hash)
+   * Check if an agent exists
    */
-  async resolveKey(spiritId: string): Promise<Hash> {
-    const result = await this.publicClient.readContract({
+  async exists(agentId: bigint): Promise<boolean> {
+    return await this.publicClient.readContract({
       address: this.addresses.SpiritRegistry,
       abi: SPIRIT_REGISTRY_ABI,
-      functionName: 'resolveKey',
-      args: [spiritId],
-    });
-
-    return result as Hash;
+      functionName: 'exists',
+      args: [agentId],
+    }) as boolean;
   }
 
   /**
-   * Get the next available token ID
+   * Get the treasury address for an agent
    */
-  async getNextTokenId(): Promise<bigint> {
-    const result = await this.publicClient.readContract({
+  async getTreasury(agentId: bigint): Promise<Address> {
+    return await this.publicClient.readContract({
       address: this.addresses.SpiritRegistry,
       abi: SPIRIT_REGISTRY_ABI,
-      functionName: 'nextTokenId',
-      args: [],
-    });
-
-    return result as bigint;
+      functionName: 'getTreasury',
+      args: [agentId],
+    }) as Address;
   }
 
   /**
-   * Check if an agent is registered
+   * Get the revenue configuration for an agent
    */
-  async isRegistered(spiritId: string): Promise<boolean> {
-    const agent = await this.getAgent(spiritId);
-    return agent !== null;
+  async getRevenueConfig(agentId: bigint): Promise<RevenueConfig> {
+    const result = await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: 'getRevenueConfig',
+      args: [agentId],
+    }) as { artistBps: number; agentBps: number; platformBps: number; protocolBps: number };
+
+    return {
+      artistBps: result.artistBps,
+      agentBps: result.agentBps,
+      platformBps: result.platformBps,
+      protocolBps: result.protocolBps,
+    };
+  }
+
+  /**
+   * Get the owner of an agent (ERC-721 owner)
+   */
+  async ownerOf(agentId: bigint): Promise<Address> {
+    return await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: 'ownerOf',
+      args: [agentId],
+    }) as Address;
+  }
+
+  /**
+   * Get the agent URI
+   */
+  async getAgentURI(agentId: bigint): Promise<string> {
+    return await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: 'agentURI',
+      args: [agentId],
+    }) as string;
+  }
+
+  /**
+   * Check if an agent has Spirit economics attached
+   */
+  async hasSpiritAttached(agentId: bigint): Promise<boolean> {
+    return await this.publicClient.readContract({
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
+      functionName: 'hasSpiritAttached',
+      args: [agentId],
+    }) as boolean;
   }
 
   // ==========================================================================
@@ -259,31 +298,26 @@ export class SpiritClient {
   // ==========================================================================
 
   /**
-   * Register a new agent with Spirit Protocol
+   * Register a new Spirit agent
+   *
+   * Creates an ERC-8004 identity with Spirit economics in one transaction.
+   * The artist address becomes the NFT owner and initial treasury.
    *
    * @throws Error if no wallet client configured
    */
-  async registerAgent(params: RegisterAgentParams): Promise<RegisterAgentResult> {
+  async registerSpirit(params: RegisterSpiritParams): Promise<RegisterSpiritResult> {
     this.requireWallet();
-
-    const split = params.split || DEFAULT_SPLIT;
 
     const { request } = await this.publicClient.simulateContract({
       address: this.addresses.SpiritRegistry,
       abi: SPIRIT_REGISTRY_ABI,
-      functionName: 'registerAgent',
+      functionName: 'registerSpirit',
       args: [
-        params.spiritId,
-        params.trainer,
+        params.agentURI,
+        params.artist,
         params.platform,
-        params.treasury,
-        params.metadataURI,
-        {
-          artistBps: split.artistBps,
-          agentBps: split.agentBps,
-          platformBps: split.platformBps,
-          protocolBps: split.protocolBps,
-        },
+        params.treasuryOwners,
+        params.treasuryThreshold,
       ],
       account: this.account!,
     });
@@ -292,36 +326,35 @@ export class SpiritClient {
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
 
-    // Parse the AgentRegistered event
+    // Parse the SpiritRegistered event to get the agentId
     const logs = parseEventLogs({
       abi: SPIRIT_REGISTRY_ABI,
       logs: receipt.logs,
-      eventName: 'AgentRegistered',
+      eventName: 'SpiritRegistered',
     });
 
     const event = logs[0];
     if (!event) {
-      throw new Error('AgentRegistered event not found in receipt');
+      throw new Error('SpiritRegistered event not found in receipt');
     }
 
     return {
-      spiritKey: event.args.spiritKey as Hash,
-      registryTokenId: event.args.registryTokenId as bigint,
+      agentId: event.args.agentId as bigint,
       txHash,
     };
   }
 
   /**
-   * Update agent metadata URI
+   * Update agent URI (metadata)
    */
-  async updateMetadata(spiritId: string, metadataURI: string): Promise<Hash> {
+  async setAgentURI(agentId: bigint, newURI: string): Promise<Hash> {
     this.requireWallet();
 
     const { request } = await this.publicClient.simulateContract({
       address: this.addresses.SpiritRegistry,
       abi: SPIRIT_REGISTRY_ABI,
-      functionName: 'updateMetadata',
-      args: [spiritId, metadataURI],
+      functionName: 'setAgentURI',
+      args: [agentId, newURI],
       account: this.account!,
     });
 
@@ -329,16 +362,16 @@ export class SpiritClient {
   }
 
   /**
-   * Update agent status
+   * Update treasury address (must be called by current treasury)
    */
-  async updateStatus(spiritId: string, status: AgentStatus): Promise<Hash> {
+  async updateTreasury(agentId: bigint, newTreasury: Address): Promise<Hash> {
     this.requireWallet();
 
     const { request } = await this.publicClient.simulateContract({
       address: this.addresses.SpiritRegistry,
       abi: SPIRIT_REGISTRY_ABI,
-      functionName: 'updateStatus',
-      args: [spiritId, status],
+      functionName: 'updateTreasury',
+      args: [agentId, newTreasury],
       account: this.account!,
     });
 
@@ -346,20 +379,16 @@ export class SpiritClient {
   }
 
   /**
-   * Record a provenance event for an agent
+   * Update revenue configuration (must be called by owner, must sum to 10000 bps)
    */
-  async recordEvent(
-    spiritId: string,
-    eventType: Hash,
-    contentHash: Hash
-  ): Promise<Hash> {
+  async setRevenueConfig(agentId: bigint, config: RevenueConfig): Promise<Hash> {
     this.requireWallet();
 
     const { request } = await this.publicClient.simulateContract({
       address: this.addresses.SpiritRegistry,
       abi: SPIRIT_REGISTRY_ABI,
-      functionName: 'recordEvent',
-      args: [spiritId, eventType, contentHash],
+      functionName: 'setRevenueConfig',
+      args: [agentId, config],
       account: this.account!,
     });
 
@@ -371,43 +400,22 @@ export class SpiritClient {
   // ==========================================================================
 
   /**
-   * Route ERC20 revenue through the 25/25/25/25 split
+   * Route revenue through the registry's built-in split
    *
-   * Note: Caller must have approved the RoyaltyRouter to spend the currency
+   * For ETH: pass token = ZERO_ADDRESS, amount = msg.value (sent as value)
+   * For ERC-20: pass token address and amount (caller must have approved registry)
    */
   async routeRevenue(params: RouteRevenueParams): Promise<RevenueEvent> {
     this.requireWallet();
 
-    const metadataHash = params.metadataHash || ZERO_HASH;
+    const isNative = params.token === ZERO_ADDRESS;
 
     const { request } = await this.publicClient.simulateContract({
-      address: this.addresses.RoyaltyRouter,
-      abi: ROYALTY_ROUTER_ABI,
+      address: this.addresses.SpiritRegistry,
+      abi: SPIRIT_REGISTRY_ABI,
       functionName: 'routeRevenue',
-      args: [params.spiritId, params.currency, params.amount, metadataHash],
-      account: this.account!,
-    });
-
-    const txHash = await this.walletClient!.writeContract(request);
-    const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
-
-    return this.parseRevenueEvent(receipt.logs, txHash);
-  }
-
-  /**
-   * Route native ETH revenue through the 25/25/25/25 split
-   */
-  async routeRevenueNative(params: RouteRevenueNativeParams): Promise<RevenueEvent> {
-    this.requireWallet();
-
-    const metadataHash = params.metadataHash || ZERO_HASH;
-
-    const { request } = await this.publicClient.simulateContract({
-      address: this.addresses.RoyaltyRouter,
-      abi: ROYALTY_ROUTER_ABI,
-      functionName: 'routeRevenueNative',
-      args: [params.spiritId, metadataHash],
-      value: params.amount,
+      args: [params.agentId, params.token, params.amount],
+      value: isNative ? params.amount : 0n,
       account: this.account!,
     });
 
@@ -420,14 +428,11 @@ export class SpiritClient {
   /**
    * Get treasury balance for an agent
    */
-  async getTreasuryBalance(spiritId: string): Promise<BalanceInfo> {
-    const agent = await this.getAgent(spiritId);
-    if (!agent) {
-      throw new Error(`Agent not found: ${spiritId}`);
-    }
+  async getTreasuryBalance(agentId: bigint): Promise<BalanceInfo> {
+    const treasury = await this.getTreasury(agentId);
 
     const native = await this.publicClient.getBalance({
-      address: agent.treasury,
+      address: treasury,
     });
 
     return { native };
@@ -465,14 +470,14 @@ export class SpiritClient {
   private requireWallet(): void {
     if (!this.walletClient || !this.account) {
       throw new Error(
-        'Wallet not configured. Provide privateKey in SpiritConfig for write operations.'
+        'Wallet not configured. Provide privateKey in SpiritClientConfig for write operations.'
       );
     }
   }
 
   private parseRevenueEvent(logs: readonly unknown[], txHash: Hash): RevenueEvent {
     const parsedLogs = parseEventLogs({
-      abi: ROYALTY_ROUTER_ABI,
+      abi: SPIRIT_REGISTRY_ABI,
       logs: logs as Parameters<typeof parseEventLogs>[0]['logs'],
       eventName: 'RevenueRouted',
     });
@@ -483,14 +488,13 @@ export class SpiritClient {
     }
 
     return {
-      spiritKey: event.args.spiritKey as Hash,
-      currency: event.args.currency as Address,
+      agentId: event.args.agentId as bigint,
+      token: event.args.token as Address,
       amount: event.args.amount as bigint,
       artistAmount: event.args.artistAmount as bigint,
       agentAmount: event.args.agentAmount as bigint,
       platformAmount: event.args.platformAmount as bigint,
       protocolAmount: event.args.protocolAmount as bigint,
-      metadataHash: event.args.metadataHash as Hash,
       txHash,
       timestamp: Date.now(),
     };

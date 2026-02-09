@@ -2,10 +2,12 @@
  * Spirit Protocol MCP Server Implementation
  *
  * Provides Spirit Protocol tools to AI agents via the Model Context Protocol.
+ * All agent lookups use numeric agentId (uint256).
  */
 
 import { SpiritClient } from '../client';
-import type { SpiritConfig, Address, AgentStatus } from '../types';
+import type { SpiritClientConfig, Address } from '../types';
+import { ZERO_ADDRESS } from '../constants';
 import { SPIRIT_TOOLS, type SpiritToolName } from './tools';
 import { formatEther } from 'viem';
 
@@ -104,9 +106,8 @@ function evaluateAgent(input: EvaluationInput): string {
         recommendation === 'REGISTER NOW'
           ? [
               '1. Prepare a treasury address (Safe multisig recommended)',
-              '2. Choose your spiritId (unique, lowercase)',
-              '3. Upload metadata to IPFS',
-              '4. Call spirit_register with your details',
+              '2. Upload metadata JSON to IPFS',
+              '3. Call spirit_register with your details',
             ]
           : recommendation === 'CONSIDER REGISTERING'
             ? [
@@ -139,7 +140,7 @@ export class SpiritMCPServer {
   private name = 'spirit-protocol';
   private version = '0.1.0';
 
-  constructor(config: SpiritConfig) {
+  constructor(config: SpiritClientConfig) {
     this.client = new SpiritClient(config);
   }
 
@@ -169,34 +170,27 @@ export class SpiritMCPServer {
     try {
       switch (name as SpiritToolName) {
         case 'spirit_get_agent':
-          return await this.handleGetAgent(args as { spiritId: string });
+          return await this.handleGetAgent(args as { agentId: number });
 
         case 'spirit_register':
           return await this.handleRegister(
             args as {
-              spiritId: string;
-              trainer: string;
+              agentURI: string;
+              artist: string;
               platform: string;
-              treasury: string;
-              metadataURI: string;
             }
           );
 
         case 'spirit_balance':
-          return await this.handleBalance(args as { spiritId: string });
+          return await this.handleBalance(args as { agentId: number });
 
         case 'spirit_route_revenue':
           return await this.handleRouteRevenue(
-            args as { spiritId: string; amount: string; currency?: string }
+            args as { agentId: number; amount: string; token?: string; decimals?: number }
           );
 
         case 'spirit_evaluate':
           return this.handleEvaluate(args as unknown as EvaluationInput);
-
-        case 'spirit_update_status':
-          return await this.handleUpdateStatus(
-            args as { spiritId: string; status: number }
-          );
 
         default:
           return this.errorResult(`Unknown tool: ${name}`);
@@ -211,29 +205,30 @@ export class SpiritMCPServer {
   // Tool Handlers
   // ==========================================================================
 
-  private async handleGetAgent(args: { spiritId: string }): Promise<MCPToolResult> {
-    const agent = await this.client.getAgent(args.spiritId);
+  private async handleGetAgent(args: { agentId: number }): Promise<MCPToolResult> {
+    const agentId = BigInt(args.agentId);
+    const agent = await this.client.getAgent(agentId);
 
     if (!agent) {
-      return this.textResult(`Agent "${args.spiritId}" not found in Spirit Protocol registry.`);
+      return this.textResult(`Agent #${args.agentId} not found in Spirit Protocol registry.`);
     }
 
     return this.textResult(
       JSON.stringify(
         {
-          spiritId: agent.spiritId,
-          registryTokenId: agent.registryTokenId.toString(),
-          trainer: agent.trainer,
+          agentId: agent.agentId.toString(),
+          owner: agent.owner,
+          agentURI: agent.agentURI,
+          artist: agent.artist,
           platform: agent.platform,
           treasury: agent.treasury,
-          metadataURI: agent.metadataURI,
-          split: {
-            artist: `${agent.split.artistBps / 100}%`,
-            agent: `${agent.split.agentBps / 100}%`,
-            platform: `${agent.split.platformBps / 100}%`,
-            protocol: `${agent.split.protocolBps / 100}%`,
+          hasToken: agent.hasToken,
+          revenueConfig: {
+            artist: `${agent.revenueConfig.artistBps / 100}%`,
+            agent: `${agent.revenueConfig.agentBps / 100}%`,
+            platform: `${agent.revenueConfig.platformBps / 100}%`,
+            protocol: `${agent.revenueConfig.protocolBps / 100}%`,
           },
-          status: ['Active', 'Paused', 'Graduated'][agent.status],
         },
         null,
         2
@@ -242,11 +237,9 @@ export class SpiritMCPServer {
   }
 
   private async handleRegister(args: {
-    spiritId: string;
-    trainer: string;
+    agentURI: string;
+    artist: string;
     platform: string;
-    treasury: string;
-    metadataURI: string;
   }): Promise<MCPToolResult> {
     if (!this.client.hasWallet()) {
       return this.errorResult(
@@ -254,21 +247,20 @@ export class SpiritMCPServer {
       );
     }
 
-    const result = await this.client.registerAgent({
-      spiritId: args.spiritId,
-      trainer: args.trainer as Address,
+    const result = await this.client.registerSpirit({
+      agentURI: args.agentURI,
+      artist: args.artist as Address,
       platform: args.platform as Address,
-      treasury: args.treasury as Address,
-      metadataURI: args.metadataURI,
+      treasuryOwners: [args.artist as Address],
+      treasuryThreshold: 1n,
     });
 
     return this.textResult(
       JSON.stringify(
         {
           success: true,
-          message: `Agent "${args.spiritId}" registered successfully!`,
-          spiritKey: result.spiritKey,
-          registryTokenId: result.registryTokenId.toString(),
+          message: `Spirit agent registered successfully!`,
+          agentId: result.agentId.toString(),
           transactionHash: result.txHash,
           explorerUrl: this.client.getExplorerUrl(result.txHash),
         },
@@ -278,13 +270,14 @@ export class SpiritMCPServer {
     );
   }
 
-  private async handleBalance(args: { spiritId: string }): Promise<MCPToolResult> {
-    const balance = await this.client.getTreasuryBalance(args.spiritId);
+  private async handleBalance(args: { agentId: number }): Promise<MCPToolResult> {
+    const agentId = BigInt(args.agentId);
+    const balance = await this.client.getTreasuryBalance(agentId);
 
     return this.textResult(
       JSON.stringify(
         {
-          spiritId: args.spiritId,
+          agentId: args.agentId,
           treasury: {
             native: {
               wei: balance.native.toString(),
@@ -299,9 +292,9 @@ export class SpiritMCPServer {
   }
 
   private async handleRouteRevenue(args: {
-    spiritId: string;
+    agentId: number;
     amount: string;
-    currency?: string;
+    token?: string;
     decimals?: number;
   }): Promise<MCPToolResult> {
     if (!this.client.hasWallet()) {
@@ -310,26 +303,19 @@ export class SpiritMCPServer {
       );
     }
 
+    const agentId = BigInt(args.agentId);
     const amount = BigInt(args.amount);
-    const isNative = !args.currency || args.currency.toLowerCase() === 'eth';
-    // Default to 18 decimals for ETH, 6 for USDC-like tokens, or use provided value
+    const isNative = !args.token || args.token.toLowerCase() === 'eth';
     const decimals = args.decimals ?? (isNative ? 18 : 6);
 
-    let event;
-    if (isNative) {
-      event = await this.client.routeRevenueNative({
-        spiritId: args.spiritId,
-        amount,
-      });
-    } else {
-      event = await this.client.routeRevenue({
-        spiritId: args.spiritId,
-        currency: args.currency as Address,
-        amount,
-      });
-    }
+    const token = isNative ? ZERO_ADDRESS : (args.token as Address);
 
-    // Format amounts based on token decimals
+    const event = await this.client.routeRevenue({
+      agentId,
+      token,
+      amount,
+    });
+
     const formatAmount = (wei: bigint) => {
       const divisor = 10n ** BigInt(decimals);
       const whole = wei / divisor;
@@ -342,8 +328,8 @@ export class SpiritMCPServer {
       JSON.stringify(
         {
           success: true,
-          message: `Revenue routed for "${args.spiritId}"`,
-          currency: isNative ? 'ETH' : args.currency,
+          message: `Revenue routed for agent #${args.agentId}`,
+          token: isNative ? 'ETH' : args.token,
           decimals,
           amounts: {
             total: formatAmount(event.amount),
@@ -371,37 +357,6 @@ export class SpiritMCPServer {
   private handleEvaluate(args: EvaluationInput): MCPToolResult {
     const assessment = evaluateAgent(args);
     return this.textResult(assessment);
-  }
-
-  private async handleUpdateStatus(args: {
-    spiritId: string;
-    status: number;
-  }): Promise<MCPToolResult> {
-    if (!this.client.hasWallet()) {
-      return this.errorResult(
-        'Wallet not configured. Provide privateKey in config for write operations.'
-      );
-    }
-
-    const txHash = await this.client.updateStatus(
-      args.spiritId,
-      args.status as AgentStatus
-    );
-
-    const statusNames = ['Active', 'Paused', 'Graduated'];
-
-    return this.textResult(
-      JSON.stringify(
-        {
-          success: true,
-          message: `Status updated for "${args.spiritId}" to ${statusNames[args.status]}`,
-          transactionHash: txHash,
-          explorerUrl: this.client.getExplorerUrl(txHash),
-        },
-        null,
-        2
-      )
-    );
   }
 
   // ==========================================================================
@@ -432,11 +387,11 @@ export class SpiritMCPServer {
  * @example
  * ```typescript
  * const server = createSpiritMCPServer({
- *   chainId: 84532,
+ *   chainId: 8453,
  *   privateKey: process.env.AGENT_PRIVATE_KEY,
  * });
  * ```
  */
-export function createSpiritMCPServer(config: SpiritConfig): SpiritMCPServer {
+export function createSpiritMCPServer(config: SpiritClientConfig): SpiritMCPServer {
   return new SpiritMCPServer(config);
 }

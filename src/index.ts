@@ -8,22 +8,26 @@
  * ```typescript
  * import { SpiritClient } from '@spirit-protocol/sdk';
  *
- * // Create client
+ * // Create client (mainnet)
+ * const spirit = new SpiritClient({ chainId: 8453 });
+ *
+ * // Get agent by numeric ID
+ * const agent = await spirit.getAgent(2n); // Abraham
+ *
+ * // Register a new Spirit agent
  * const spirit = new SpiritClient({
- *   chainId: 84532, // Base Sepolia
+ *   chainId: 8453,
  *   privateKey: process.env.PRIVATE_KEY,
  * });
- *
- * // Register an agent
- * const result = await spirit.registerAgent({
- *   spiritId: 'my-agent',
- *   trainer: '0x...',
+ * const result = await spirit.registerSpirit({
+ *   agentURI: 'ipfs://...',
+ *   artist: '0x...',
  *   platform: '0x...',
- *   treasury: '0x...',
- *   metadataURI: 'ipfs://...',
+ *   treasuryOwners: ['0x...'],
+ *   treasuryThreshold: 1n,
  * });
  *
- * console.log('Agent registered:', result.spiritKey);
+ * console.log('Agent registered:', result.agentId);
  * ```
  *
  * @packageDocumentation
@@ -41,32 +45,28 @@ export type {
 
   // Agent types
   SpiritAgent,
-  AgentEconomics,
-  SplitConfig,
-  RegisterAgentParams,
-  RegisterAgentResult,
+  RevenueConfig,
+  RegisterSpiritParams,
+  RegisterSpiritResult,
 
   // Revenue types
   RevenueEvent,
   RouteRevenueParams,
-  RouteRevenueNativeParams,
 
   // Client configuration
-  SpiritConfig,
+  SpiritClientConfig,
 
   // Event types
-  AgentRegisteredEvent,
-  AgentConfiguredEvent,
-  StatusUpdatedEvent,
-  ProvenanceEvent,
+  SpiritRegisteredEvent,
+  RevenueRoutedEvent,
+  TreasuryUpdatedEvent,
+  RegisteredEvent,
 
   // Utility types
-  AgentFilter,
   BalanceInfo,
-  SpiritTransactionReceipt,
 } from './types';
 
-export { AgentStatus, DEFAULT_SPLIT } from './types';
+export { DEFAULT_REVENUE_CONFIG } from './types';
 
 // Constants
 export {
@@ -78,7 +78,6 @@ export {
 
   // Contract ABIs
   SPIRIT_REGISTRY_ABI,
-  ROYALTY_ROUTER_ABI,
 
   // Protocol constants
   BPS_DENOMINATOR,
