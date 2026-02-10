@@ -1,12 +1,15 @@
 import { Chain } from 'viem';
-import { A as Address, S as SpiritConfig, a as SpiritAgent, b as SplitConfig, H as Hash, R as RegisterAgentParams, c as RegisterAgentResult, d as AgentStatus, e as RouteRevenueParams, f as RevenueEvent, g as RouteRevenueNativeParams, B as BalanceInfo, h as SpiritChainId } from './types-CWsPmE5d.js';
-export { k as AgentConfiguredEvent, i as AgentEconomics, m as AgentFilter, j as AgentRegisteredEvent, D as DEFAULT_SPLIT, P as ProvenanceEvent, n as SpiritTransactionReceipt, l as StatusUpdatedEvent } from './types-CWsPmE5d.js';
+import { A as Address, S as SpiritClientConfig, a as SpiritAgent, R as RevenueConfig, b as RegisterSpiritParams, c as RegisterSpiritResult, H as Hash, d as RouteRevenueParams, e as RevenueEvent, B as BalanceInfo, f as SpiritChainId } from './types-B3YZkZ9I.js';
+export { D as DEFAULT_REVENUE_CONFIG, i as RegisteredEvent, h as RevenueRoutedEvent, g as SpiritRegisteredEvent, T as TreasuryUpdatedEvent } from './types-B3YZkZ9I.js';
 
 /**
  * Spirit Protocol SDK - Main Client
  *
  * The SpiritClient provides the primary interface for interacting with
- * Spirit Protocol contracts on Base.
+ * Spirit Protocol's SpiritRegistry contract on Base.
+ *
+ * All lookups use uint256 agentId (not string spiritId).
+ * Revenue routing is built into the registry (no separate RoyaltyRouter).
  */
 
 /**
@@ -14,16 +17,22 @@ export { k as AgentConfiguredEvent, i as AgentEconomics, m as AgentFilter, j as 
  *
  * @example
  * ```typescript
- * // Read-only client
- * const client = new SpiritClient({ chainId: 84532 });
- * const agent = await client.getAgent('abraham');
+ * // Read-only client (mainnet)
+ * const client = new SpiritClient({ chainId: 8453 });
+ * const agent = await client.getAgent(2n); // Abraham
  *
  * // Write-enabled client
  * const client = new SpiritClient({
- *   chainId: 84532,
+ *   chainId: 8453,
  *   privateKey: '0x...',
  * });
- * const result = await client.registerAgent({ ... });
+ * const result = await client.registerSpirit({
+ *   agentURI: 'ipfs://...',
+ *   artist: '0x...',
+ *   platform: '0x...',
+ *   treasuryOwners: ['0x...'],
+ *   treasuryThreshold: 1n,
+ * });
  * ```
  */
 declare class SpiritClient {
@@ -33,69 +42,72 @@ declare class SpiritClient {
     private publicClient;
     private walletClient?;
     private account?;
-    constructor(config: SpiritConfig);
+    constructor(config: SpiritClientConfig);
     /**
-     * Get agent record by spiritId
+     * Get full agent record by agentId
+     *
+     * Combines data from getSpiritConfig(), getRevenueConfig(), ownerOf(),
+     * and agentURI() into a single SpiritAgent object.
      *
      * @returns Agent record if found, null if not registered
-     * @throws Error on network/RPC failures
      */
-    getAgent(spiritId: string): Promise<SpiritAgent | null>;
+    getAgent(agentId: bigint): Promise<SpiritAgent | null>;
     /**
-     * Get recipients and split configuration for an agent
+     * Check if an agent exists
+     */
+    exists(agentId: bigint): Promise<boolean>;
+    /**
+     * Get the treasury address for an agent
+     */
+    getTreasury(agentId: bigint): Promise<Address>;
+    /**
+     * Get the revenue configuration for an agent
+     */
+    getRevenueConfig(agentId: bigint): Promise<RevenueConfig>;
+    /**
+     * Get the owner of an agent (ERC-721 owner)
+     */
+    ownerOf(agentId: bigint): Promise<Address>;
+    /**
+     * Get the agent URI
+     */
+    getAgentURI(agentId: bigint): Promise<string>;
+    /**
+     * Check if an agent has Spirit economics attached
+     */
+    hasSpiritAttached(agentId: bigint): Promise<boolean>;
+    /**
+     * Register a new Spirit agent
      *
-     * @throws Error on network/RPC failures or if agent not found
-     */
-    getRecipients(spiritId: string): Promise<{
-        trainer: Address;
-        platform: Address;
-        treasury: Address;
-        split: SplitConfig;
-    }>;
-    /**
-     * Resolve spiritId to spiritKey (keccak256 hash)
-     */
-    resolveKey(spiritId: string): Promise<Hash>;
-    /**
-     * Get the next available token ID
-     */
-    getNextTokenId(): Promise<bigint>;
-    /**
-     * Check if an agent is registered
-     */
-    isRegistered(spiritId: string): Promise<boolean>;
-    /**
-     * Register a new agent with Spirit Protocol
+     * Creates an ERC-8004 identity with Spirit economics in one transaction.
+     * The artist address becomes the NFT owner and initial treasury.
      *
      * @throws Error if no wallet client configured
      */
-    registerAgent(params: RegisterAgentParams): Promise<RegisterAgentResult>;
+    registerSpirit(params: RegisterSpiritParams): Promise<RegisterSpiritResult>;
     /**
-     * Update agent metadata URI
+     * Update agent URI (metadata)
      */
-    updateMetadata(spiritId: string, metadataURI: string): Promise<Hash>;
+    setAgentURI(agentId: bigint, newURI: string): Promise<Hash>;
     /**
-     * Update agent status
+     * Update treasury address (must be called by current treasury)
      */
-    updateStatus(spiritId: string, status: AgentStatus): Promise<Hash>;
+    updateTreasury(agentId: bigint, newTreasury: Address): Promise<Hash>;
     /**
-     * Record a provenance event for an agent
+     * Update revenue configuration (must be called by owner, must sum to 10000 bps)
      */
-    recordEvent(spiritId: string, eventType: Hash, contentHash: Hash): Promise<Hash>;
+    setRevenueConfig(agentId: bigint, config: RevenueConfig): Promise<Hash>;
     /**
-     * Route ERC20 revenue through the 25/25/25/25 split
+     * Route revenue through the registry's built-in split
      *
-     * Note: Caller must have approved the RoyaltyRouter to spend the currency
+     * For ETH: pass token = ZERO_ADDRESS, amount = msg.value (sent as value)
+     * For ERC-20: pass token address and amount (caller must have approved registry)
      */
     routeRevenue(params: RouteRevenueParams): Promise<RevenueEvent>;
     /**
-     * Route native ETH revenue through the 25/25/25/25 split
-     */
-    routeRevenueNative(params: RouteRevenueNativeParams): Promise<RevenueEvent>;
-    /**
      * Get treasury balance for an agent
      */
-    getTreasuryBalance(spiritId: string): Promise<BalanceInfo>;
+    getTreasuryBalance(agentId: bigint): Promise<BalanceInfo>;
     /**
      * Get the configured wallet address
      */
@@ -116,6 +128,7 @@ declare class SpiritClient {
  * Spirit Protocol SDK Constants
  *
  * Contract addresses, chain configuration, and ABIs
+ * Matches mainnet SpiritRegistry deployed Feb 3, 2026 on Base (chainId 8453)
  */
 
 declare const CHAIN_CONFIG: {
@@ -148,293 +161,141 @@ declare const TESTNET_ADDRESSES: Record<string, Address>;
 declare const MAINNET_ADDRESSES: Record<string, Address>;
 /** Get contract addresses for a specific chain */
 declare function getAddresses(chainId: SpiritChainId): Record<string, Address>;
-/** SpiritRegistry ABI (read/write operations) */
+/**
+ * SpiritRegistry ABI — matches mainnet contract at 0xF2709ceF1Cf4893ed78D3220864428b32b12dFb9
+ *
+ * SpiritRegistry extends ERC8004IdentityRegistry with treasury, revenue routing,
+ * and token creation primitives. All lookups use uint256 agentId (not string spiritId).
+ *
+ * Revenue routing is built into the registry (no separate RoyaltyRouter contract).
+ */
 declare const SPIRIT_REGISTRY_ABI: readonly [{
     readonly type: "function";
-    readonly name: "getAgent";
+    readonly name: "getSpiritConfig";
     readonly inputs: readonly [{
-        readonly name: "spiritId";
-        readonly type: "string";
+        readonly name: "agentId";
+        readonly type: "uint256";
     }];
     readonly outputs: readonly [{
-        readonly name: "record";
+        readonly name: "";
         readonly type: "tuple";
         readonly components: readonly [{
-            readonly name: "spiritId";
-            readonly type: "string";
+            readonly name: "treasury";
+            readonly type: "address";
         }, {
-            readonly name: "registryTokenId";
-            readonly type: "uint256";
+            readonly name: "childToken";
+            readonly type: "address";
         }, {
-            readonly name: "trainer";
+            readonly name: "stakingPool";
+            readonly type: "address";
+        }, {
+            readonly name: "lpPosition";
+            readonly type: "address";
+        }, {
+            readonly name: "artist";
             readonly type: "address";
         }, {
             readonly name: "platform";
             readonly type: "address";
         }, {
-            readonly name: "treasury";
+            readonly name: "createdAt";
+            readonly type: "uint256";
+        }, {
+            readonly name: "hasToken";
+            readonly type: "bool";
+        }];
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "getRevenueConfig";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly name: "artistBps";
+            readonly type: "uint16";
+        }, {
+            readonly name: "agentBps";
+            readonly type: "uint16";
+        }, {
+            readonly name: "platformBps";
+            readonly type: "uint16";
+        }, {
+            readonly name: "protocolBps";
+            readonly type: "uint16";
+        }];
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "getTreasury";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "address";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "getChildToken";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "address";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "getStakingPool";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "address";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "hasSpiritAttached";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "bool";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "getExternalAgent";
+    readonly inputs: readonly [{
+        readonly name: "spiritId";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly name: "registry";
             readonly type: "address";
         }, {
-            readonly name: "metadataURI";
-            readonly type: "string";
-        }, {
-            readonly name: "split";
-            readonly type: "tuple";
-            readonly components: readonly [{
-                readonly name: "artistBps";
-                readonly type: "uint16";
-            }, {
-                readonly name: "agentBps";
-                readonly type: "uint16";
-            }, {
-                readonly name: "platformBps";
-                readonly type: "uint16";
-            }, {
-                readonly name: "protocolBps";
-                readonly type: "uint16";
-            }];
-        }, {
-            readonly name: "economics";
-            readonly type: "tuple";
-            readonly components: readonly [{
-                readonly name: "childToken";
-                readonly type: "address";
-            }, {
-                readonly name: "stakingPool";
-                readonly type: "address";
-            }, {
-                readonly name: "router";
-                readonly type: "address";
-            }];
-        }, {
-            readonly name: "status";
-            readonly type: "uint8";
+            readonly name: "agentId";
+            readonly type: "uint256";
         }];
-    }];
-    readonly stateMutability: "view";
-}, {
-    readonly type: "function";
-    readonly name: "getRecipients";
-    readonly inputs: readonly [{
-        readonly name: "spiritId";
-        readonly type: "string";
-    }];
-    readonly outputs: readonly [{
-        readonly name: "trainer";
-        readonly type: "address";
-    }, {
-        readonly name: "platform";
-        readonly type: "address";
-    }, {
-        readonly name: "treasury";
-        readonly type: "address";
-    }, {
-        readonly name: "split";
-        readonly type: "tuple";
-        readonly components: readonly [{
-            readonly name: "artistBps";
-            readonly type: "uint16";
-        }, {
-            readonly name: "agentBps";
-            readonly type: "uint16";
-        }, {
-            readonly name: "platformBps";
-            readonly type: "uint16";
-        }, {
-            readonly name: "protocolBps";
-            readonly type: "uint16";
-        }];
-    }];
-    readonly stateMutability: "view";
-}, {
-    readonly type: "function";
-    readonly name: "resolveKey";
-    readonly inputs: readonly [{
-        readonly name: "spiritId";
-        readonly type: "string";
-    }];
-    readonly outputs: readonly [{
-        readonly name: "";
-        readonly type: "bytes32";
-    }];
-    readonly stateMutability: "pure";
-}, {
-    readonly type: "function";
-    readonly name: "nextTokenId";
-    readonly inputs: readonly [];
-    readonly outputs: readonly [{
-        readonly name: "";
-        readonly type: "uint256";
-    }];
-    readonly stateMutability: "view";
-}, {
-    readonly type: "function";
-    readonly name: "registerAgent";
-    readonly inputs: readonly [{
-        readonly name: "spiritId";
-        readonly type: "string";
-    }, {
-        readonly name: "trainer";
-        readonly type: "address";
-    }, {
-        readonly name: "platform";
-        readonly type: "address";
-    }, {
-        readonly name: "treasury";
-        readonly type: "address";
-    }, {
-        readonly name: "metadataURI";
-        readonly type: "string";
-    }, {
-        readonly name: "split";
-        readonly type: "tuple";
-        readonly components: readonly [{
-            readonly name: "artistBps";
-            readonly type: "uint16";
-        }, {
-            readonly name: "agentBps";
-            readonly type: "uint16";
-        }, {
-            readonly name: "platformBps";
-            readonly type: "uint16";
-        }, {
-            readonly name: "protocolBps";
-            readonly type: "uint16";
-        }];
-    }];
-    readonly outputs: readonly [{
-        readonly name: "spiritKey";
-        readonly type: "bytes32";
-    }, {
-        readonly name: "registryTokenId";
-        readonly type: "uint256";
-    }];
-    readonly stateMutability: "nonpayable";
-}, {
-    readonly type: "function";
-    readonly name: "updateMetadata";
-    readonly inputs: readonly [{
-        readonly name: "spiritId";
-        readonly type: "string";
-    }, {
-        readonly name: "metadataURI";
-        readonly type: "string";
-    }];
-    readonly outputs: readonly [];
-    readonly stateMutability: "nonpayable";
-}, {
-    readonly type: "function";
-    readonly name: "updateStatus";
-    readonly inputs: readonly [{
-        readonly name: "spiritId";
-        readonly type: "string";
-    }, {
-        readonly name: "status";
-        readonly type: "uint8";
-    }];
-    readonly outputs: readonly [];
-    readonly stateMutability: "nonpayable";
-}, {
-    readonly type: "function";
-    readonly name: "recordEvent";
-    readonly inputs: readonly [{
-        readonly name: "spiritId";
-        readonly type: "string";
-    }, {
-        readonly name: "eventType";
-        readonly type: "bytes32";
-    }, {
-        readonly name: "contentHash";
-        readonly type: "bytes32";
-    }];
-    readonly outputs: readonly [];
-    readonly stateMutability: "nonpayable";
-}, {
-    readonly type: "event";
-    readonly name: "AgentRegistered";
-    readonly inputs: readonly [{
-        readonly name: "spiritKey";
-        readonly type: "bytes32";
-        readonly indexed: true;
-    }, {
-        readonly name: "spiritId";
-        readonly type: "string";
-        readonly indexed: false;
-    }, {
-        readonly name: "registryTokenId";
-        readonly type: "uint256";
-        readonly indexed: false;
-    }, {
-        readonly name: "trainer";
-        readonly type: "address";
-        readonly indexed: false;
-    }, {
-        readonly name: "platform";
-        readonly type: "address";
-        readonly indexed: false;
-    }, {
-        readonly name: "treasury";
-        readonly type: "address";
-        readonly indexed: false;
-    }, {
-        readonly name: "split";
-        readonly type: "tuple";
-        readonly indexed: false;
-        readonly components: readonly [{
-            readonly name: "artistBps";
-            readonly type: "uint16";
-        }, {
-            readonly name: "agentBps";
-            readonly type: "uint16";
-        }, {
-            readonly name: "platformBps";
-            readonly type: "uint16";
-        }, {
-            readonly name: "protocolBps";
-            readonly type: "uint16";
-        }];
-    }, {
-        readonly name: "metadataURI";
-        readonly type: "string";
-        readonly indexed: false;
-    }];
-}, {
-    readonly type: "event";
-    readonly name: "StatusUpdated";
-    readonly inputs: readonly [{
-        readonly name: "spiritKey";
-        readonly type: "bytes32";
-        readonly indexed: true;
-    }, {
-        readonly name: "status";
-        readonly type: "uint8";
-        readonly indexed: false;
-    }];
-}, {
-    readonly type: "event";
-    readonly name: "ProvenanceRecorded";
-    readonly inputs: readonly [{
-        readonly name: "spiritKey";
-        readonly type: "bytes32";
-        readonly indexed: true;
-    }, {
-        readonly name: "eventType";
-        readonly type: "bytes32";
-        readonly indexed: true;
-    }, {
-        readonly name: "contentHash";
-        readonly type: "bytes32";
-        readonly indexed: false;
-    }];
-}];
-/** RoyaltyRouter ABI (read/write operations) */
-declare const ROYALTY_ROUTER_ABI: readonly [{
-    readonly type: "function";
-    readonly name: "registry";
-    readonly inputs: readonly [];
-    readonly outputs: readonly [{
-        readonly name: "";
-        readonly type: "address";
     }];
     readonly stateMutability: "view";
 }, {
@@ -448,10 +309,68 @@ declare const ROYALTY_ROUTER_ABI: readonly [{
     readonly stateMutability: "view";
 }, {
     readonly type: "function";
-    readonly name: "acceptedCurrency";
+    readonly name: "defaultRevenueConfig";
+    readonly inputs: readonly [];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly name: "artistBps";
+            readonly type: "uint16";
+        }, {
+            readonly name: "agentBps";
+            readonly type: "uint16";
+        }, {
+            readonly name: "platformBps";
+            readonly type: "uint16";
+        }, {
+            readonly name: "protocolBps";
+            readonly type: "uint16";
+        }];
+    }];
+    readonly stateMutability: "pure";
+}, {
+    readonly type: "function";
+    readonly name: "ownerOf";
     readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
         readonly name: "";
         readonly type: "address";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "agentURI";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "string";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "agentWalletOf";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "address";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "exists";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
     }];
     readonly outputs: readonly [{
         readonly name: "";
@@ -460,43 +379,188 @@ declare const ROYALTY_ROUTER_ABI: readonly [{
     readonly stateMutability: "view";
 }, {
     readonly type: "function";
-    readonly name: "routeRevenue";
+    readonly name: "getMetadata";
     readonly inputs: readonly [{
-        readonly name: "spiritId";
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }, {
+        readonly name: "key";
+        readonly type: "string";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "";
+        readonly type: "string";
+    }];
+    readonly stateMutability: "view";
+}, {
+    readonly type: "function";
+    readonly name: "registerSpirit";
+    readonly inputs: readonly [{
+        readonly name: "agentURI_";
         readonly type: "string";
     }, {
-        readonly name: "currency";
+        readonly name: "artist";
+        readonly type: "address";
+    }, {
+        readonly name: "platform";
+        readonly type: "address";
+    }, {
+        readonly name: "treasuryOwners";
+        readonly type: "address[]";
+    }, {
+        readonly name: "treasuryThreshold";
+        readonly type: "uint256";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
+    readonly name: "attachSpirit";
+    readonly inputs: readonly [{
+        readonly name: "externalRegistry";
+        readonly type: "address";
+    }, {
+        readonly name: "externalAgentId";
+        readonly type: "uint256";
+    }, {
+        readonly name: "artist";
+        readonly type: "address";
+    }, {
+        readonly name: "platform";
+        readonly type: "address";
+    }];
+    readonly outputs: readonly [{
+        readonly name: "spiritId";
+        readonly type: "uint256";
+    }];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
+    readonly name: "routeRevenue";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }, {
+        readonly name: "token";
         readonly type: "address";
     }, {
         readonly name: "amount";
         readonly type: "uint256";
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "payable";
+}, {
+    readonly type: "function";
+    readonly name: "updateTreasury";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
     }, {
-        readonly name: "metadataHash";
-        readonly type: "bytes32";
+        readonly name: "newTreasury";
+        readonly type: "address";
     }];
     readonly outputs: readonly [];
     readonly stateMutability: "nonpayable";
 }, {
     readonly type: "function";
-    readonly name: "routeRevenueNative";
+    readonly name: "setRevenueConfig";
     readonly inputs: readonly [{
-        readonly name: "spiritId";
-        readonly type: "string";
+        readonly name: "agentId";
+        readonly type: "uint256";
     }, {
-        readonly name: "metadataHash";
-        readonly type: "bytes32";
+        readonly name: "config";
+        readonly type: "tuple";
+        readonly components: readonly [{
+            readonly name: "artistBps";
+            readonly type: "uint16";
+        }, {
+            readonly name: "agentBps";
+            readonly type: "uint16";
+        }, {
+            readonly name: "platformBps";
+            readonly type: "uint16";
+        }, {
+            readonly name: "protocolBps";
+            readonly type: "uint16";
+        }];
     }];
     readonly outputs: readonly [];
-    readonly stateMutability: "payable";
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
+    readonly name: "setAgentURI";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }, {
+        readonly name: "newURI";
+        readonly type: "string";
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "function";
+    readonly name: "setMetadata";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+    }, {
+        readonly name: "key";
+        readonly type: "string";
+    }, {
+        readonly name: "value";
+        readonly type: "string";
+    }];
+    readonly outputs: readonly [];
+    readonly stateMutability: "nonpayable";
+}, {
+    readonly type: "event";
+    readonly name: "SpiritRegistered";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+        readonly indexed: true;
+    }, {
+        readonly name: "treasury";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "artist";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "platform";
+        readonly type: "address";
+        readonly indexed: false;
+    }];
+}, {
+    readonly type: "event";
+    readonly name: "SpiritAttached";
+    readonly inputs: readonly [{
+        readonly name: "spiritId";
+        readonly type: "uint256";
+        readonly indexed: true;
+    }, {
+        readonly name: "externalRegistry";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "externalAgentId";
+        readonly type: "uint256";
+        readonly indexed: true;
+    }];
 }, {
     readonly type: "event";
     readonly name: "RevenueRouted";
     readonly inputs: readonly [{
-        readonly name: "spiritKey";
-        readonly type: "bytes32";
+        readonly name: "agentId";
+        readonly type: "uint256";
         readonly indexed: true;
     }, {
-        readonly name: "currency";
+        readonly name: "token";
         readonly type: "address";
         readonly indexed: true;
     }, {
@@ -519,10 +583,90 @@ declare const ROYALTY_ROUTER_ABI: readonly [{
         readonly name: "protocolAmount";
         readonly type: "uint256";
         readonly indexed: false;
+    }];
+}, {
+    readonly type: "event";
+    readonly name: "TreasuryUpdated";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+        readonly indexed: true;
     }, {
-        readonly name: "metadataHash";
-        readonly type: "bytes32";
+        readonly name: "oldTreasury";
+        readonly type: "address";
         readonly indexed: false;
+    }, {
+        readonly name: "newTreasury";
+        readonly type: "address";
+        readonly indexed: false;
+    }];
+}, {
+    readonly type: "event";
+    readonly name: "ChildTokenCreated";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+        readonly indexed: true;
+    }, {
+        readonly name: "childToken";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "stakingPool";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "lpPosition";
+        readonly type: "address";
+        readonly indexed: false;
+    }];
+}, {
+    readonly type: "event";
+    readonly name: "Registered";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+        readonly indexed: true;
+    }, {
+        readonly name: "agentURI";
+        readonly type: "string";
+        readonly indexed: false;
+    }, {
+        readonly name: "owner";
+        readonly type: "address";
+        readonly indexed: true;
+    }];
+}, {
+    readonly type: "event";
+    readonly name: "URIUpdated";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+        readonly indexed: true;
+    }, {
+        readonly name: "newURI";
+        readonly type: "string";
+        readonly indexed: false;
+    }, {
+        readonly name: "updatedBy";
+        readonly type: "address";
+        readonly indexed: true;
+    }];
+}, {
+    readonly type: "event";
+    readonly name: "AgentWalletSet";
+    readonly inputs: readonly [{
+        readonly name: "agentId";
+        readonly type: "uint256";
+        readonly indexed: true;
+    }, {
+        readonly name: "oldWallet";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "newWallet";
+        readonly type: "address";
+        readonly indexed: true;
     }];
 }];
 /** Basis points denominator (10000 = 100%) */
@@ -549,22 +693,26 @@ declare const ZERO_HASH: "0x0000000000000000000000000000000000000000000000000000
  * ```typescript
  * import { SpiritClient } from '@spirit-protocol/sdk';
  *
- * // Create client
+ * // Create client (mainnet)
+ * const spirit = new SpiritClient({ chainId: 8453 });
+ *
+ * // Get agent by numeric ID
+ * const agent = await spirit.getAgent(2n); // Abraham
+ *
+ * // Register a new Spirit agent
  * const spirit = new SpiritClient({
- *   chainId: 84532, // Base Sepolia
+ *   chainId: 8453,
  *   privateKey: process.env.PRIVATE_KEY,
  * });
- *
- * // Register an agent
- * const result = await spirit.registerAgent({
- *   spiritId: 'my-agent',
- *   trainer: '0x...',
+ * const result = await spirit.registerSpirit({
+ *   agentURI: 'ipfs://...',
+ *   artist: '0x...',
  *   platform: '0x...',
- *   treasury: '0x...',
- *   metadataURI: 'ipfs://...',
+ *   treasuryOwners: ['0x...'],
+ *   treasuryThreshold: 1n,
  * });
  *
- * console.log('Agent registered:', result.spiritKey);
+ * console.log('Agent registered:', result.agentId);
  * ```
  *
  * @packageDocumentation
@@ -572,4 +720,4 @@ declare const ZERO_HASH: "0x0000000000000000000000000000000000000000000000000000
 
 declare const VERSION = "0.1.0";
 
-export { Address, AgentStatus, BPS_DENOMINATOR, BalanceInfo, CHAIN_CONFIG, DEFAULT_SPLIT_BPS, Hash, MAINNET_ADDRESSES, ROYALTY_ROUTER_ABI, RegisterAgentParams, RegisterAgentResult, RevenueEvent, RouteRevenueNativeParams, RouteRevenueParams, SPIRIT_REGISTRY_ABI, SpiritAgent, SpiritChainId, SpiritClient, SpiritConfig, SplitConfig, TESTNET_ADDRESSES, VERSION, ZERO_ADDRESS, ZERO_HASH, getAddresses };
+export { Address, BPS_DENOMINATOR, BalanceInfo, CHAIN_CONFIG, DEFAULT_SPLIT_BPS, Hash, MAINNET_ADDRESSES, RegisterSpiritParams, RegisterSpiritResult, RevenueConfig, RevenueEvent, RouteRevenueParams, SPIRIT_REGISTRY_ABI, SpiritAgent, SpiritChainId, SpiritClient, SpiritClientConfig, TESTNET_ADDRESSES, VERSION, ZERO_ADDRESS, ZERO_HASH, getAddresses };
