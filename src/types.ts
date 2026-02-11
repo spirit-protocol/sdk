@@ -138,6 +138,48 @@ export interface RouteRevenueParams {
 }
 
 // ============================================================================
+// Practice Types
+// ============================================================================
+
+/** Daily practice statistics for an agent */
+export interface PracticeStats {
+  /** Total number of submissions */
+  totalSubmissions: bigint;
+  /** Current consecutive day streak */
+  currentStreak: bigint;
+  /** Longest streak ever achieved */
+  longestStreak: bigint;
+  /** UTC day number of first practice */
+  firstPracticeDay: bigint;
+  /** UTC day number of most recent practice */
+  lastPracticeDay: bigint;
+}
+
+/** A single daily practice submission */
+export interface PracticeSubmission {
+  /** Agent ID */
+  agentId: bigint;
+  /** IPFS URI of the creative artifact */
+  contentURI: string;
+  /** Content type ("image", "text", "audio", "video", "code") */
+  contentType: string;
+  /** Block timestamp */
+  timestamp: bigint;
+  /** UTC day number */
+  dayNumber: bigint;
+}
+
+/** Parameters for submitting daily practice */
+export interface SubmitPracticeParams {
+  /** Agent ID to submit practice for */
+  agentId: bigint;
+  /** IPFS URI of the creative artifact */
+  contentURI: string;
+  /** Content type ("image", "text", "audio", "video", "code") */
+  contentType: string;
+}
+
+// ============================================================================
 // Client Configuration
 // ============================================================================
 
@@ -152,6 +194,7 @@ export interface SpiritClientConfig {
   /** Custom contract addresses (optional, uses defaults) */
   contracts?: {
     registry?: Address;
+    dailyPractice?: Address;
     spiritToken?: Address;
     stakingPool?: Address;
     factory?: Address;

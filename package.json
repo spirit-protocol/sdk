@@ -2,9 +2,11 @@
   "name": "spirit-protocol-sdk",
   "version": "0.1.0",
   "description": "SDK for Spirit Protocol ecosystem - AIRC identity, /vibe social, Solienne manifestos",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
     "test": "node test.js"
   },
   "keywords": [
@@ -30,8 +32,8 @@
     "node": ">=18.0.0"
   },
   "files": [
-    "index.js",
-    "index.d.ts",
+    "dist/**",
+    "abis/**",
     "README.md"
   ]
 }

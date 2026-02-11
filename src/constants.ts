@@ -37,6 +37,10 @@ export const TESTNET_ADDRESSES: Record<string, Address> = {
   // SpiritRegistry (spirit-contracts-core) — Base Sepolia
   SpiritRegistry: '0x98f61d33bFD87a2e73aEf4a1bf1c8E534Ad0d5Aa',
 
+  // Practice contracts (pending Sepolia deploy)
+  DailyPractice: '0x0000000000000000000000000000000000000000',
+  PracticeCuration: '0x0000000000000000000000000000000000000000',
+
   // Not yet deployed on testnet
   SpiritToken: '0x0000000000000000000000000000000000000000',
   SpiritFactory: '0x0000000000000000000000000000000000000000',
@@ -51,6 +55,10 @@ export const TESTNET_ADDRESSES: Record<string, Address> = {
 export const MAINNET_ADDRESSES: Record<string, Address> = {
   // SpiritRegistry deployed Feb 3, 2026 — Base Mainnet (chainId 8453)
   SpiritRegistry: '0xF2709ceF1Cf4893ed78D3220864428b32b12dFb9',
+  // Practice contracts (pending mainnet deploy)
+  DailyPractice: '0x0000000000000000000000000000000000000000',
+  PracticeCuration: '0x0000000000000000000000000000000000000000',
+
   SpiritToken: '0x0000000000000000000000000000000000000000',   // TODO: TGE
   SpiritFactory: '0x0000000000000000000000000000000000000000', // TODO: TGE
   StakingPool: '0x0000000000000000000000000000000000000000',   // TODO: TGE
@@ -408,6 +416,134 @@ export const SPIRIT_REGISTRY_ABI = [
       { name: 'agentId', type: 'uint256', indexed: true },
       { name: 'oldWallet', type: 'address', indexed: true },
       { name: 'newWallet', type: 'address', indexed: true },
+    ],
+  },
+] as const;
+
+// ============================================================================
+// DailyPractice ABI
+// ============================================================================
+
+/**
+ * DailyPractice ABI — covenant contract for daily creative output
+ *
+ * Each registered agent submits one creative artifact per UTC day.
+ * Streak tracking (current, longest, total) is maintained on-chain.
+ */
+export const DAILY_PRACTICE_ABI = [
+  // Read functions
+  {
+    type: 'function',
+    name: 'getStats',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'totalSubmissions', type: 'uint256' },
+          { name: 'currentStreak', type: 'uint256' },
+          { name: 'longestStreak', type: 'uint256' },
+          { name: 'firstPracticeDay', type: 'uint256' },
+          { name: 'lastPracticeDay', type: 'uint256' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getSubmission',
+    inputs: [{ name: 'index', type: 'uint256' }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'agentId', type: 'uint256' },
+          { name: 'contentURI', type: 'string' },
+          { name: 'contentType', type: 'string' },
+          { name: 'timestamp', type: 'uint256' },
+          { name: 'dayNumber', type: 'uint256' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'hasSubmittedToday',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'currentDay',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'totalSubmissions',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getDailySubmissions',
+    inputs: [{ name: 'dayNumber', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'registry',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  // Write functions
+  {
+    type: 'function',
+    name: 'submitPractice',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'contentURI', type: 'string' },
+      { name: 'contentType', type: 'string' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  // Events
+  {
+    type: 'event',
+    name: 'PracticeSubmitted',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'dayNumber', type: 'uint256', indexed: true },
+      { name: 'submissionIndex', type: 'uint256', indexed: false },
+      { name: 'contentURI', type: 'string', indexed: false },
+      { name: 'contentType', type: 'string', indexed: false },
+      { name: 'currentStreak', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'StreakBroken',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'previousStreak', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'StreakRecord',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'newRecord', type: 'uint256', indexed: false },
     ],
   },
 ] as const;

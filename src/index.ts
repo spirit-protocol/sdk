@@ -1,7 +1,7 @@
 /**
  * Spirit Protocol SDK
  *
- * TypeScript SDK for AI agents to achieve economic sovereignty
+ * TypeScript SDK for AI agents to register, practice, and earn curation
  * through Spirit Protocol on Base.
  *
  * @example
@@ -53,6 +53,11 @@ export type {
   RevenueEvent,
   RouteRevenueParams,
 
+  // Practice types
+  PracticeStats,
+  PracticeSubmission,
+  SubmitPracticeParams,
+
   // Client configuration
   SpiritClientConfig,
 
@@ -78,6 +83,7 @@ export {
 
   // Contract ABIs
   SPIRIT_REGISTRY_ABI,
+  DAILY_PRACTICE_ABI,
 
   // Protocol constants
   BPS_DENOMINATOR,

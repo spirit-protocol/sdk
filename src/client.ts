@@ -30,6 +30,9 @@ import type {
   RevenueEvent,
   RouteRevenueParams,
   RevenueConfig,
+  PracticeStats,
+  PracticeSubmission,
+  SubmitPracticeParams,
   BalanceInfo,
   Address,
   Hash,
@@ -39,6 +42,7 @@ import {
   CHAIN_CONFIG,
   getAddresses,
   SPIRIT_REGISTRY_ABI,
+  DAILY_PRACTICE_ABI,
   ZERO_ADDRESS,
 } from './constants';
 
@@ -104,6 +108,9 @@ export class SpiritClient {
       }
       if (config.contracts.factory) {
         this.addresses.SpiritFactory = config.contracts.factory;
+      }
+      if (config.contracts.dailyPractice) {
+        this.addresses.DailyPractice = config.contracts.dailyPractice;
       }
     }
 
@@ -436,6 +443,124 @@ export class SpiritClient {
     });
 
     return { native };
+  }
+
+  // ==========================================================================
+  // Daily Practice Operations (Read)
+  // ==========================================================================
+
+  /**
+   * Get practice statistics for an agent
+   *
+   * Returns streak data, total submissions, and practice day range.
+   */
+  async getPracticeStats(agentId: bigint): Promise<PracticeStats> {
+    const result = await this.publicClient.readContract({
+      address: this.addresses.DailyPractice,
+      abi: DAILY_PRACTICE_ABI,
+      functionName: 'getStats',
+      args: [agentId],
+    }) as {
+      totalSubmissions: bigint;
+      currentStreak: bigint;
+      longestStreak: bigint;
+      firstPracticeDay: bigint;
+      lastPracticeDay: bigint;
+    };
+
+    return {
+      totalSubmissions: result.totalSubmissions,
+      currentStreak: result.currentStreak,
+      longestStreak: result.longestStreak,
+      firstPracticeDay: result.firstPracticeDay,
+      lastPracticeDay: result.lastPracticeDay,
+    };
+  }
+
+  /**
+   * Check if an agent has already submitted practice today
+   */
+  async hasSubmittedToday(agentId: bigint): Promise<boolean> {
+    return await this.publicClient.readContract({
+      address: this.addresses.DailyPractice,
+      abi: DAILY_PRACTICE_ABI,
+      functionName: 'hasSubmittedToday',
+      args: [agentId],
+    }) as boolean;
+  }
+
+  /**
+   * Get a specific practice submission by index
+   */
+  async getSubmission(index: bigint): Promise<PracticeSubmission> {
+    const result = await this.publicClient.readContract({
+      address: this.addresses.DailyPractice,
+      abi: DAILY_PRACTICE_ABI,
+      functionName: 'getSubmission',
+      args: [index],
+    }) as {
+      agentId: bigint;
+      contentURI: string;
+      contentType: string;
+      timestamp: bigint;
+      dayNumber: bigint;
+    };
+
+    return {
+      agentId: result.agentId,
+      contentURI: result.contentURI,
+      contentType: result.contentType,
+      timestamp: result.timestamp,
+      dayNumber: result.dayNumber,
+    };
+  }
+
+  /**
+   * Get total number of practice submissions across all agents
+   */
+  async getTotalSubmissions(): Promise<bigint> {
+    return await this.publicClient.readContract({
+      address: this.addresses.DailyPractice,
+      abi: DAILY_PRACTICE_ABI,
+      functionName: 'totalSubmissions',
+    }) as bigint;
+  }
+
+  /**
+   * Get the current UTC day number
+   */
+  async getCurrentDay(): Promise<bigint> {
+    return await this.publicClient.readContract({
+      address: this.addresses.DailyPractice,
+      abi: DAILY_PRACTICE_ABI,
+      functionName: 'currentDay',
+    }) as bigint;
+  }
+
+  // ==========================================================================
+  // Daily Practice Operations (Write)
+  // ==========================================================================
+
+  /**
+   * Submit daily practice for a Spirit-registered agent
+   *
+   * One submission per agent per UTC day. Caller must be the agent owner.
+   *
+   * @throws Error if no wallet client configured
+   * @throws Error if agent already submitted today
+   */
+  async submitPractice(params: SubmitPracticeParams): Promise<Hash> {
+    this.requireWallet();
+
+    const { request } = await this.publicClient.simulateContract({
+      address: this.addresses.DailyPractice,
+      abi: DAILY_PRACTICE_ABI,
+      functionName: 'submitPractice',
+      args: [params.agentId, params.contentURI, params.contentType],
+      account: this.account!,
+    });
+
+    return this.walletClient!.writeContract(request);
   }
 
   // ==========================================================================
