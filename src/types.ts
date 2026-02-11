@@ -34,7 +34,10 @@ export interface RevenueConfig {
   protocolBps: number;
 }
 
-/** Default 25/25/25/25 revenue split */
+/**
+ * Default 25/25/25/25 revenue split
+ * @deprecated Phase 2 -- revenue routing is deferred
+ */
 export const DEFAULT_REVENUE_CONFIG: RevenueConfig = {
   artistBps: 2500,
   agentBps: 2500,
@@ -102,10 +105,13 @@ export interface RegisterSpiritResult {
 }
 
 // ============================================================================
-// Revenue Types
+// Revenue Types (Phase 2 -- deferred until agents have proven daily practice)
 // ============================================================================
 
-/** Revenue routing event data */
+/**
+ * Revenue routing event data
+ * @deprecated Phase 2 -- revenue routing is deferred
+ */
 export interface RevenueEvent {
   /** Agent ID */
   agentId: bigint;
@@ -127,7 +133,10 @@ export interface RevenueEvent {
   timestamp: number;
 }
 
-/** Parameters for routing revenue */
+/**
+ * Parameters for routing revenue
+ * @deprecated Phase 2 -- revenue routing is deferred
+ */
 export interface RouteRevenueParams {
   /** Agent ID to route revenue for */
   agentId: bigint;

@@ -247,6 +247,7 @@ export class SpiritClient {
 
   /**
    * Get the revenue configuration for an agent
+   * @deprecated Phase 2 -- revenue routing is deferred until agents have proven daily practice
    */
   async getRevenueConfig(agentId: bigint): Promise<RevenueConfig> {
     const result = await this.publicClient.readContract({
@@ -387,6 +388,7 @@ export class SpiritClient {
 
   /**
    * Update revenue configuration (must be called by owner, must sum to 10000 bps)
+   * @deprecated Phase 2 -- revenue routing is deferred until agents have proven daily practice
    */
   async setRevenueConfig(agentId: bigint, config: RevenueConfig): Promise<Hash> {
     this.requireWallet();
@@ -403,7 +405,7 @@ export class SpiritClient {
   }
 
   // ==========================================================================
-  // Revenue Operations
+  // Revenue Operations (Phase 2 -- deferred until agents have proven practice)
   // ==========================================================================
 
   /**
@@ -411,6 +413,8 @@ export class SpiritClient {
    *
    * For ETH: pass token = ZERO_ADDRESS, amount = msg.value (sent as value)
    * For ERC-20: pass token address and amount (caller must have approved registry)
+   *
+   * @deprecated Phase 2 -- revenue routing is deferred until agents have proven daily practice
    */
   async routeRevenue(params: RouteRevenueParams): Promise<RevenueEvent> {
     this.requireWallet();
@@ -434,6 +438,7 @@ export class SpiritClient {
 
   /**
    * Get treasury balance for an agent
+   * @deprecated Phase 2 -- revenue routing is deferred until agents have proven daily practice
    */
   async getTreasuryBalance(agentId: bigint): Promise<BalanceInfo> {
     const treasury = await this.getTreasury(agentId);

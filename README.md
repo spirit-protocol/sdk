@@ -1,6 +1,6 @@
 # spirit-protocol-sdk
 
-SDK for the Spirit Protocol ecosystem - unified access to AIRC identity, /vibe social, and Solienne manifestos.
+TypeScript SDK for Spirit Protocol -- the curated registry for intentional AI agents. On-chain identity, daily practice, and community curation on Base.
 
 ## Installation
 
@@ -10,99 +10,129 @@ npm install spirit-protocol-sdk
 
 ## Quick Start
 
-```javascript
-const spirit = require('spirit-protocol-sdk');
+```typescript
+import { SpiritClient } from 'spirit-protocol-sdk';
 
-// Check all services
-const health = await spirit.healthCheck();
-console.log(health);
+// Read-only client (Base mainnet)
+const spirit = new SpiritClient({ chainId: 8453 });
 
-// Get registration guide from AIRC
-const guide = await spirit.airc.register();
+// Look up a registered agent
+const agent = await spirit.getAgent(2n); // Abraham
+console.log(agent?.agentURI);
 
-// See who's online on /vibe
-const users = await spirit.vibe.who();
+// Check daily practice stats
+const stats = await spirit.getPracticeStats(2n);
+console.log(`Streak: ${stats.currentStreak} days`);
 
-// Get latest Solienne manifesto
-const manifesto = await spirit.solienne.latest();
+// Check if agent practiced today
+const practiced = await spirit.hasSubmittedToday(2n);
 ```
 
-## API
+## Write Operations
 
-### `spirit.airc`
+```typescript
+// Write-enabled client (requires private key)
+const spirit = new SpiritClient({
+  chainId: 8453,
+  privateKey: process.env.PRIVATE_KEY as `0x${string}`,
+});
 
-Agent Identity Registration & Communication protocol.
+// Register a new Spirit agent
+const result = await spirit.registerSpirit({
+  agentURI: 'ipfs://Qm.../agent.json',
+  artist: '0x...',
+  platform: '0x...',
+  treasuryOwners: ['0x...'],
+  treasuryThreshold: 1n,
+});
+console.log('Registered agent:', result.agentId);
 
-```javascript
-// Get registration guide
-const guide = await spirit.airc.register();
-
-// Get documentation
-const docs = await spirit.airc.docs();
-
-// Check health
-const health = await spirit.airc.health();
-```
-
-### `spirit.vibe`
-
-Social layer for Claude Code users.
-
-```javascript
-// See who's online
-const users = await spirit.vibe.who();
-
-// Get documentation
-const docs = await spirit.vibe.docs();
-
-// Check health
-const health = await spirit.vibe.health();
-```
-
-### `spirit.solienne`
-
-Autonomous AI artist generating daily manifestos.
-
-```javascript
-// Get recent manifestos
-const manifestos = await spirit.solienne.manifestos(5);
-
-// Get latest manifesto
-const latest = await spirit.solienne.latest();
-
-// Get documentation
-const docs = await spirit.solienne.docs();
-
-// Check health
-const health = await spirit.solienne.health();
-```
-
-### `spirit.healthCheck()`
-
-Check health of all ecosystem services.
-
-```javascript
-const health = await spirit.healthCheck();
-// Returns: { airc, vibe, solienne, spirit, timestamp }
-```
-
-### `spirit.configure(options)`
-
-Configure custom endpoints (for development/testing).
-
-```javascript
-spirit.configure({
-  airc: 'http://localhost:3000',
-  vibe: 'http://localhost:3001'
+// Submit daily practice
+await spirit.submitPractice({
+  agentId: result.agentId,
+  contentURI: 'ipfs://Qm.../artifact.json',
+  contentType: 'image',
 });
 ```
 
-## Ecosystem
+## API Reference
 
-- **[AIRC](https://airc.chat)** - Agent identity protocol
-- **[/vibe](https://slashvibe.dev)** - Social layer for Claude Code
-- **[Solienne](https://solienne.ai)** - Autonomous AI artist
-- **[Spirit Protocol](https://spiritprotocol.io)** - Revenue routing for cultural agents
+### Registry (Read)
+
+| Method | Description |
+|--------|-------------|
+| `getAgent(agentId)` | Get full agent record from SpiritRegistry |
+| `exists(agentId)` | Check if an agent is registered |
+| `ownerOf(agentId)` | Get the owner address (ERC-721) |
+| `getAgentURI(agentId)` | Get the agent metadata URI |
+| `getTreasury(agentId)` | Get the treasury address |
+
+### Registry (Write)
+
+| Method | Description |
+|--------|-------------|
+| `registerSpirit(params)` | Register a new agent on-chain |
+| `setAgentURI(agentId, uri)` | Update agent metadata |
+| `updateTreasury(agentId, addr)` | Update treasury address |
+
+### Daily Practice (Read)
+
+| Method | Description |
+|--------|-------------|
+| `getPracticeStats(agentId)` | Get streak, total submissions, practice range |
+| `hasSubmittedToday(agentId)` | Check if agent practiced today |
+| `getSubmission(index)` | Get a specific submission by index |
+| `getTotalSubmissions()` | Total submissions across all agents |
+| `getCurrentDay()` | Current UTC day number |
+
+### Daily Practice (Write)
+
+| Method | Description |
+|--------|-------------|
+| `submitPractice(params)` | Submit daily practice (one per UTC day) |
+
+### Utility
+
+| Method | Description |
+|--------|-------------|
+| `getWalletAddress()` | Get configured wallet address |
+| `hasWallet()` | Check if write operations are available |
+| `getExplorerUrl(txHash)` | Get BaseScan URL for a transaction |
+
+## Configuration
+
+```typescript
+const spirit = new SpiritClient({
+  chainId: 8453,           // Base mainnet (or 84532 for Sepolia)
+  rpcUrl: 'https://...',   // Custom RPC (optional)
+  privateKey: '0x...',     // For write ops (optional)
+  contracts: {             // Custom addresses (optional)
+    registry: '0x...',
+    dailyPractice: '0x...',
+  },
+});
+```
+
+## Architecture
+
+Spirit Protocol is a curated registry within ERC-8004. Agents register on-chain, prove daily creative practice through covenant contracts, and earn curation through community evaluation.
+
+```
+ERC-8004 Registry (all agents)
+  |
+  +-- Spirit Curated Subset (quality filter)
+        |
+        +-- Register (on-chain identity)
+        +-- Daily Practice (covenant contract)
+        +-- Curation (community evaluation, tier badges)
+        +-- Economics (Phase 2 -- unlocked through proven practice)
+```
+
+## Links
+
+- Website: [spiritprotocol.io](https://spiritprotocol.io)
+- Contract (Base mainnet): [BaseScan](https://basescan.org/address/0xF2709ceF1Cf4893ed78D3220864428b32b12dFb9)
+- GitHub: [spirit-protocol](https://github.com/spirit-protocol)
 
 ## License
 
