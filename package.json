@@ -1,7 +1,7 @@
 {
   "name": "spirit-protocol-sdk",
   "version": "0.1.0",
-  "description": "SDK for Spirit Protocol ecosystem - AIRC identity, /vibe social, Solienne manifestos",
+  "description": "TypeScript SDK for Spirit Protocol — on-chain agent identity, revenue routing, and governance (ERC-8004)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -11,11 +11,11 @@
   },
   "keywords": [
     "spirit-protocol",
-    "airc",
-    "vibe",
-    "solienne",
+    "erc-8004",
     "ai-agents",
-    "cultural-agents",
+    "base",
+    "onchain-identity",
+    "revenue-routing",
     "sdk"
   ],
   "author": "Seth Goldstein <seth@spiritprotocol.io>",
