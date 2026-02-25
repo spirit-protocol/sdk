@@ -5,7 +5,7 @@
  * Matches mainnet SpiritRegistry deployed Feb 3, 2026 on Base (chainId 8453)
  */
 
-import type { Address, SpiritChainId } from './types';
+import type { Address, SpiritChainId } from './types.js';
 
 // ============================================================================
 // Chain Configuration
@@ -55,9 +55,9 @@ export const TESTNET_ADDRESSES: Record<string, Address> = {
 export const MAINNET_ADDRESSES: Record<string, Address> = {
   // SpiritRegistry deployed Feb 3, 2026 — Base Mainnet (chainId 8453)
   SpiritRegistry: '0xF2709ceF1Cf4893ed78D3220864428b32b12dFb9',
-  // Practice contracts (pending mainnet deploy)
-  DailyPractice: '0x0000000000000000000000000000000000000000',
-  PracticeCuration: '0x0000000000000000000000000000000000000000',
+  // Practice contracts — deployed Feb 20, 2026
+  DailyPractice: '0x8d8cd4a00695E3775268d446e8ea632305869b5F',
+  PracticeCuration: '0x6f9013F3821d24E8aEE0717F80b7644304A7fE4F',
 
   SpiritToken: '0x0000000000000000000000000000000000000000',   // TODO: TGE
   SpiritFactory: '0x0000000000000000000000000000000000000000', // TODO: TGE
@@ -517,6 +517,36 @@ export const DAILY_PRACTICE_ABI = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
+  {
+    type: 'function',
+    name: 'authorizeOperator',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'operator', type: 'address' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'revokeOperator',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'operator', type: 'address' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'isOperator',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'operator', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
   // Events
   {
     type: 'event',
@@ -544,6 +574,22 @@ export const DAILY_PRACTICE_ABI = [
     inputs: [
       { name: 'agentId', type: 'uint256', indexed: true },
       { name: 'newRecord', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'OperatorAuthorized',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'operator', type: 'address', indexed: true },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'OperatorRevoked',
+    inputs: [
+      { name: 'agentId', type: 'uint256', indexed: true },
+      { name: 'operator', type: 'address', indexed: true },
     ],
   },
 ] as const;

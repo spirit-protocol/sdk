@@ -34,7 +34,7 @@
  */
 
 // Main client
-export { SpiritClient } from './client';
+export { SpiritClient } from './client.js';
 
 // Types
 export type {
@@ -69,9 +69,9 @@ export type {
 
   // Utility types
   BalanceInfo,
-} from './types';
+} from './types.js';
 
-export { DEFAULT_REVENUE_CONFIG } from './types';
+export { DEFAULT_REVENUE_CONFIG } from './types.js';
 
 // Constants
 export {
@@ -90,7 +90,7 @@ export {
   DEFAULT_SPLIT_BPS,
   ZERO_ADDRESS,
   ZERO_HASH,
-} from './constants';
+} from './constants.js';
 
 // Version
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.2';

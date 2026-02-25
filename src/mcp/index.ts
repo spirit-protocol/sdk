@@ -18,5 +18,5 @@
  * ```
  */
 
-export { createSpiritMCPServer, SpiritMCPServer } from './server';
-export { SPIRIT_TOOLS, type SpiritToolName } from './tools';
+export { createSpiritMCPServer, SpiritMCPServer } from './server.js';
+export { SPIRIT_TOOLS, type SpiritToolName } from './tools.js';

@@ -36,7 +36,7 @@ import type {
   BalanceInfo,
   Address,
   Hash,
-} from './types';
+} from './types.js';
 
 import {
   CHAIN_CONFIG,
@@ -44,7 +44,7 @@ import {
   SPIRIT_REGISTRY_ABI,
   DAILY_PRACTICE_ABI,
   ZERO_ADDRESS,
-} from './constants';
+} from './constants.js';
 
 // ============================================================================
 // Helper Functions

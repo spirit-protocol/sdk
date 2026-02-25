@@ -1,13 +1,13 @@
 {
-  "name": "spirit-protocol-sdk",
-  "version": "0.1.0",
+  "name": "@spirit-protocol/sdk",
+  "version": "0.2.2",
+  "type": "module",
   "description": "TypeScript SDK for Spirit Protocol — on-chain agent identity, revenue routing, and governance (ERC-8004)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "npm run build",
-    "test": "node test.js"
+    "build": "npx tsc",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "spirit-protocol",
@@ -28,6 +28,9 @@
   "bugs": {
     "url": "https://github.com/spirit-protocol/sdk/issues"
   },
+  "peerDependencies": {
+    "viem": ">=2.0.0"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
@@ -35,5 +38,8 @@
     "dist/**",
     "abis/**",
     "README.md"
-  ]
+  ],
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
 }

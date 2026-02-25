@@ -5,10 +5,10 @@
  * All agent lookups use numeric agentId (uint256).
  */
 
-import { SpiritClient } from '../client';
-import type { SpiritClientConfig, Address } from '../types';
-import { ZERO_ADDRESS } from '../constants';
-import { SPIRIT_TOOLS, type SpiritToolName } from './tools';
+import { SpiritClient } from '../client.js';
+import type { SpiritClientConfig, Address } from '../types.js';
+import { ZERO_ADDRESS } from '../constants.js';
+import { SPIRIT_TOOLS, type SpiritToolName } from './tools.js';
 import { formatEther } from 'viem';
 
 // ============================================================================
